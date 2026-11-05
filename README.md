@@ -33,9 +33,8 @@ Firefox, Discord and VS Code are optional shortcuts; their commands must exist (
 
 ## Install
 
-The GitHub URL below is a **placeholder** until you publish this repository.
 
-    git clone https://github.com/YOUR_USERNAME/arch-chromebook-hyprland.git
+    git clone https://github.com/howellg/arch-chromebook-hyprland.git
     cd arch-chromebook-hyprland
     ./install.sh --dry-run
     ./install.sh
