@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""Lightweight GTK/Cairo screenshot annotator: pen, arrow, rectangle, text."""
+from pathlib import Path
+from datetime import datetime
+import math
+import os
+import subprocess
+import sys
+import tempfile
+import gi
+import cairo
+gi.require_version("Gtk","3.0")
+gi.require_version("Gdk","3.0")
+gi.require_version("GdkPixbuf","2.0")
+from gi.repository import Gtk, Gdk, GdkPixbuf
+
+home=Path.home()
+screens=home/"Pictures/Screenshots"
+screens.mkdir(parents=True,exist_ok=True)
+mode=sys.argv[1] if len(sys.argv)>1 else "region"
+if mode not in ("region","full"):
+    raise SystemExit("Usage: hypr-screenshot-edit [region|full]")
+
+capture=tempfile.NamedTemporaryFile(suffix=".png",prefix="chromebook-edit-",delete=False)
+temp=Path(capture.name);capture.close()
+try:
+    args=["grim","-t","png"]
+    if mode=="region":
+        selected=subprocess.run(["slurp"],capture_output=True,text=True)
+        if selected.returncode or not selected.stdout.strip():raise SystemExit(0)
+        args.extend(["-g",selected.stdout.strip()])
+    args.append(str(temp))
+    result=subprocess.run(args,capture_output=True)
+    if result.returncode:raise SystemExit("grim failed: "+result.stderr.decode(errors="replace"))
+    source=GdkPixbuf.Pixbuf.new_from_file(str(temp))
+except Exception:
+    temp.unlink(missing_ok=True)
+    raise
+
+class Annotate(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Annotate Screenshot")
+        self.connect("destroy",self.quit)
+        self.connect("key-press-event",lambda _w,e:self.destroy() if e.keyval==Gdk.KEY_Escape else False)
+        self.set_default_size(1080,700)
+        self.set_border_width(10)
+        self.source=source
+        self.w,self.h=source.get_width(),source.get_height()
+        scale=min(1,1020/self.w,630/self.h)
+        self.pw,self.ph=round(self.w*scale),round(self.h*scale)
+        self.shapes=[];self.active=None
+        self.color=(0.54,0.71,0.98,0.95)
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8);self.add(root)
+        top=Gtk.Box(spacing=8);root.pack_start(top,False,False,0)
+        self.tool=Gtk.ComboBoxText()
+        for name in ("Pen","Arrow","Rectangle","Highlight","Text"):self.tool.append_text(name)
+        self.tool.set_active(0);top.pack_start(self.tool,False,False,0)
+        for name,hexcolor in (("Blue","#89b4fa"),("Red","#f38ba8"),("Green","#a6e3a1"),("Yellow","#f9e2af")):
+            b=Gtk.Button(label=name)
+            b.connect("clicked",self.change_color,hexcolor)
+            top.pack_start(b,False,False,0)
+        self.text=Gtk.Entry()
+        self.text.set_placeholder_text("Text to add")
+        self.text.set_width_chars(15)
+        top.pack_start(self.text,True,True,0)
+        for label,func in (("Undo",self.undo),("Copy",self.copy),("Save PNG",self.save)):
+            btn=Gtk.Button(label=label);btn.connect("clicked",func);top.pack_start(btn,False,False,0)
+        scroll=Gtk.ScrolledWindow();root.pack_start(scroll,True,True,0)
+        self.canvas=Gtk.DrawingArea()
+        self.canvas.set_size_request(self.pw,self.ph)
+        self.canvas.add_events(Gdk.EventMask.BUTTON_PRESS_MASK|Gdk.EventMask.BUTTON_RELEASE_MASK|Gdk.EventMask.POINTER_MOTION_MASK)
+        self.canvas.connect("draw",self.draw)
+        self.canvas.connect("button-press-event",self.start)
+        self.canvas.connect("motion-notify-event",self.move)
+        self.canvas.connect("button-release-event",self.end)
+        scroll.add_with_viewport(self.canvas)
+        self.status=Gtk.Label(label="Draw to annotate. Text: enter text above, then click the image.")
+        root.pack_start(self.status,False,False,0)
+        self.show_all()
+
+    def quit(self,*_):
+        temp.unlink(missing_ok=True)
+        Gtk.main_quit()
+
+    def change_color(self,_button,color):
+        color=color.lstrip("#")
+        self.color=tuple(int(color[i:i+2],16)/255 for i in (0,2,4))+(0.93,)
+
+    def loc(self,event):
+        return (event.x*self.w/self.pw,event.y*self.h/self.ph)
+
+    def start(self,_w,event):
+        if event.button!=1:return
+        tool=self.tool.get_active_text()
+        start=self.loc(event)
+        if tool=="Text":
+            txt=self.text.get_text().strip()
+            if txt:
+                self.shapes.append({"tool":"Text","points":[start],"color":self.color,"text":txt})
+                self.canvas.queue_draw()
+        else:
+            self.active={"tool":tool,"points":[start],"color":self.color}
+
+    def move(self,_w,event):
+        if self.active is None:return
+        point=self.loc(event)
+        if self.active["tool"] in ("Pen","Highlight"):
+            self.active["points"].append(point)
+        else:
+            self.active["points"]=self.active["points"][:1]+[point]
+        self.canvas.queue_draw()
+
+    def end(self,_w,event):
+        if self.active is None:return
+        self.move(_w,event)
+        self.shapes.append(self.active)
+        self.active=None
+        self.canvas.queue_draw()
+
+    def draw_objects(self,ctx):
+        for shape in self.shapes+([self.active] if self.active else []):
+            ctx.save()
+            r,g,b,a=shape["color"];ctx.set_source_rgba(r,g,b,a)
+            tool=shape["tool"];pts=shape["points"]
+            ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+            ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+            ctx.set_line_width(6 if tool=="Pen" else (17 if tool=="Highlight" else 5))
+            if tool=="Text":
+                ctx.select_font_face("Sans",cairo.FONT_SLANT_NORMAL,cairo.FONT_WEIGHT_BOLD)
+                ctx.set_font_size(max(26,round(self.w/48)))
+                ctx.move_to(pts[0][0],pts[0][1])
+                ctx.show_text(shape.get("text",""))
+            elif len(pts)>1:
+                x,y=pts[0];ctx.move_to(x,y)
+                if tool=="Rectangle":
+                    qx,qy=pts[-1];ctx.rectangle(x,y,qx-x,qy-y)
+                else:
+                    for qx,qy in pts[1:]:ctx.line_to(qx,qy)
+                ctx.stroke()
+                if tool=="Arrow":
+                    ex,ey=pts[-1]
+                    theta=math.atan2(ey-y,ex-x)
+                    for turn in (-0.55,0.55):
+                        tx=ex-24*math.cos(theta+turn)
+                        ty=ey-24*math.sin(theta+turn)
+                        ctx.move_to(ex,ey);ctx.line_to(tx,ty);ctx.stroke()
+            ctx.restore()
+
+    def paint(self,ctx):
+        Gdk.cairo_set_source_pixbuf(ctx,self.source,0,0)
+        ctx.paint()
+        self.draw_objects(ctx)
+
+    def draw(self,_widget,ctx):
+        ctx.scale(self.pw/self.w,self.ph/self.h)
+        self.paint(ctx)
+        return False
+
+    def undo(self,*_):
+        if self.shapes:self.shapes.pop()
+        self.canvas.queue_draw()
+
+    def result_png(self):
+        surface=cairo.ImageSurface(cairo.FORMAT_ARGB32,self.w,self.h)
+        ctx=cairo.Context(surface)
+        self.paint(ctx)
+        out=tempfile.NamedTemporaryFile(suffix=".png",delete=False)
+        path=Path(out.name);out.close();surface.write_to_png(str(path));surface.finish()
+        return path
+
+    def copy(self,*_):
+        output=self.result_png()
+        try:
+            subprocess.run(["wl-copy","--type","image/png"],input=output.read_bytes(),check=True,timeout=8)
+            self.status.set_text("Annotated image copied to clipboard.")
+        except Exception as exc:self.status.set_text(str(exc))
+        finally:output.unlink(missing_ok=True)
+
+    def save(self,*_):
+        output=self.result_png()
+        dest=screens/("Annotated_"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")+".png")
+        os.replace(output,dest)
+        self.status.set_text("Saved: "+str(dest))
+        subprocess.Popen(["notify-send","Screenshot saved",str(dest)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+
+Annotate()
+Gtk.main()

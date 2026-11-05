@@ -1,4 +1,3 @@
-
 {
     "layer": "top",
     "position": "top",
@@ -7,17 +6,14 @@
     "margin-top": 4,
     "margin-left": 8,
     "margin-right": 8,
-
     "modules-left": [
         "custom/arch",
         "hyprland/workspaces",
-	"hyprland/window"
+        "hyprland/window"
     ],
-
     "modules-center": [
         "clock"
     ],
-
     "modules-right": [
         "cpu",
         "memory",
@@ -25,45 +21,47 @@
         "pulseaudio",
         "backlight",
         "battery",
+        "custom/settings",
+        "custom/power-profile",
         "tray",
         "custom/power"
     ],
-
     "custom/arch": {
         "format": "󰣇",
         "tooltip": false,
         "on-click": "@HOME@/.local/bin/hypr-app-launcher"
     },
-
     "hyprland/workspaces": {
-        "format": "{name}",
+        "format": "{icon} {name}",
         "on-click": "activate",
         "sort-by-number": true,
         "persistent-workspaces": {
             "*": 5
+        },
+        "format-icons": {
+            "1": "󰈹",
+            "2": "󰨞",
+            "3": "󰙯",
+            "9": "󰚩",
+            "default": ""
         }
     },
-
     "hyprland/window": {
         "format": "{title}",
         "max-length": 20
     },
-
     "clock": {
         "format": "󰥔  {:%a %d %b · %H:%M}",
         "tooltip-format": "<tt>{calendar}</tt>"
     },
-
     "cpu": {
         "format": "󰍛  {usage}%",
         "interval": 5
     },
-
     "memory": {
         "format": "󰘚  {}%",
         "interval": 5
     },
-
     "network": {
         "format-wifi": "󰤨  {signalStrength}%",
         "format-ethernet": "󰈀",
@@ -71,20 +69,21 @@
         "tooltip-format-wifi": "{essid}\n{ipaddr}",
         "on-click": "nm-connection-editor"
     },
-
     "pulseaudio": {
         "format": "{icon}  {volume}%",
         "format-muted": "󰝟",
         "format-icons": {
-            "default": ["󰕿", "󰖀", "󰕾"]
+            "default": [
+                "󰕿",
+                "󰖀",
+                "󰕾"
+            ]
         },
         "on-click": "pavucontrol"
     },
-
     "backlight": {
         "format": "󰃠  {percent}%"
     },
-
     "battery": {
         "bat": "BAT0",
         "interval": 10,
@@ -95,20 +94,41 @@
         "format": "{icon}  {capacity}%",
         "format-charging": "󰂄  {capacity}%",
         "format-icons": [
-            "󰂎", "󰁺", "󰁻", "󰁼", "󰁽",
-            "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"
+            "󰂎",
+            "󰁺",
+            "󰁻",
+            "󰁼",
+            "󰁽",
+            "󰁾",
+            "󰁿",
+            "󰂀",
+            "󰂁",
+            "󰂂",
+            "󰁹"
         ]
     },
-
     "tray": {
         "icon-size": 15,
         "spacing": 8
     },
-
     "custom/power": {
         "format": "󰐥",
         "tooltip": true,
         "tooltip-format": "Power menu · Super+Shift+E",
         "on-click": "@HOME@/.local/bin/hypr-power-menu"
+    },
+    "custom/settings": {
+        "format": "󰒓",
+        "tooltip": true,
+        "tooltip-format": "Quick settings · Super+Shift+Q",
+        "on-click": "@HOME@/.local/bin/hypr-quick-settings"
+    },
+    "custom/power-profile": {
+        "exec": "@HOME@/.local/bin/hypr-profile-waybar",
+        "interval": 10,
+        "return-type": "text",
+        "on-click": "@HOME@/.local/bin/hypr-quick-settings",
+        "tooltip": true,
+        "tooltip-format": "Power profile · click to change"
     }
 }

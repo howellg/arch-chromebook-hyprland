@@ -55,9 +55,13 @@ fi
 echo "Installed $copies files, skipped $skips."
 [[ -d "$backup" ]] && echo "Backup directory: $backup"
 
-if command -v systemctl >/dev/null && [[ -f "$HOME/.config/systemd/user/chromebook-battery-watch.timer" ]]; then
+if command -v systemctl >/dev/null; then
   systemctl --user daemon-reload
-  systemctl --user enable --now chromebook-battery-watch.timer
+  for timer in chromebook-battery-watch.timer chromebook-power-profile.timer; do
+    if [[ -f "$HOME/.config/systemd/user/$timer" ]]; then
+      systemctl --user enable --now "$timer"
+    fi
+  done
 fi
 echo "Restart your Hyprland session for autostart settings to apply."
 echo "Check Hyprland errors using: hyprctl configerrors"

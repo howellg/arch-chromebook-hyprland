@@ -14,3 +14,14 @@ Do not automatically play loud audio, lock the desktop, reboot, or start a remot
 10. **Compatibility:** Copied Lua configuration requires Hyprland 0.55 or newer.
 
 Chromebooks differ in power, audio and input devices. Verify compatibility before adopting the project on other models.
+
+## New feature smoke tests
+
+11. Open Super+Shift+Q and inspect Wi-Fi, Bluetooth, volume, brightness, and power profile status. Avoid toggling the active network during remote work.
+12. Open Super+Shift+W, import a local image, select it, and verify wallpaper and accent colors change. No wallpaper is shipped in this repository.
+13. Open Super+Shift+P, choose a nonsensitive region, draw a pen stroke, arrow, box, and text. Try Copy and Save PNG. Verify files under ~/Pictures/Screenshots.
+14. To test recording, install wf-recorder, press Super+Shift+R, select a region, then stop with Super+Shift+T. Confirm an MP4 is saved in ~/Videos/Recordings.
+15. Try the four-finger swipe up/down and three-finger pinch; check these don't interfere with important touchpad behavior.
+16. Open the Overview window grid and confirm live thumbnails only appear for windows visible on the current workspace.
+17. While on AC, the Auto power policy should choose Balanced. When safely unplugged, it should choose Power Saver after the next timer tick (within three minutes). Verify with powerprofilesctl get; set manual override in Quick Settings.
+18. Run chromebook-hardware-check --json and compare battery, backlight, and input capabilities with physical hardware. Do not publish serials or sensitive data.

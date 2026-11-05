@@ -1,0 +1,24 @@
+/* Catppuccin Mocha GTK3 quick settings */
+window.quick-settings {
+    background-color: rgba(30, 30, 46, 0.94);
+    color: #cdd6f4;
+    border: 1px solid #89b4fa;
+    border-radius: 18px;
+}
+window.quick-settings label { color: #cdd6f4; font-family: "JetBrainsMono Nerd Font"; }
+window.quick-settings .heading { font-weight: bold; font-size: 19px; margin-bottom: 7px; }
+window.quick-settings .section { color: #a6adc8; font-weight: bold; }
+window.quick-settings button {
+    background-image: none;
+    background-color: rgba(49, 50, 68, 0.90);
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 8px;
+}
+window.quick-settings button:hover { background-color: #45475a; border-color: #89b4fa; }
+window.quick-settings button:active { background-color: #585b70; }
+window.quick-settings trough { min-height: 7px; border-radius: 5px; background: #45475a; }
+window.quick-settings highlight { background: #89b4fa; border-radius: 5px; }
+window.quick-settings slider { background: #b4befe; border-radius: 10px; min-width: 14px; min-height: 14px; }

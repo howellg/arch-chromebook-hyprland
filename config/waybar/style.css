@@ -39,7 +39,9 @@ tooltip label {
 #backlight,
 #battery,
 #tray,
-#custom-power {
+#custom-power,
+#custom-settings,
+#custom-power-profile {
     background: rgba(30, 30, 46, 0.94);
     border: 1px solid rgba(88, 91, 112, 0.45);
     border-radius: 11px;
@@ -158,3 +160,8 @@ window#waybar.empty #window {
     background: rgba(69, 71, 90, 0.96);
     color: #fab387;
 }
+
+/* Chromebook quick controls */
+#custom-settings { color: #89b4fa; font-size: 17px; }
+#custom-power-profile { color: #a6e3a1; }
+#custom-settings:hover, #custom-power-profile:hover { background: rgba(69, 71, 90, 0.95); }

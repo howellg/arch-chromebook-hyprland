@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Visual wallpaper browser + optional generated accent for Chromebook Hyprland."""
+from pathlib import Path
+from datetime import datetime
+import re
+import shutil
+import subprocess
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, GdkPixbuf, Gdk
+
+HOME=Path.home()
+WALLS=HOME / "Pictures/Wallpapers"
+WALLS.mkdir(parents=True, exist_ok=True)
+EXTS={".png", ".jpg", ".jpeg", ".webp", ".jxl"}
+
+def run(args):
+    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+
+def accent_from_image(image):
+    pb=GdkPixbuf.Pixbuf.new_from_file_at_scale(str(image),80,80,True)
+    b=pb.get_pixels()
+    channels=pb.get_n_channels()
+    stride=pb.get_rowstride()
+    colors=[]
+    for y in range(0,pb.get_height(),3):
+        for x in range(0,pb.get_width(),3):
+            offset=y*stride+x*channels
+            rgb=tuple(b[offset+i] for i in range(3))
+            if max(rgb)-min(rgb)>35 and max(rgb)>70:
+                colors.append(rgb)
+    if not colors:
+        return "#89b4fa"
+    colors.sort(key=lambda c: sum(c))
+    r,g,b=colors[len(colors)//2]
+    # Lighten colors enough for readability against a dark Catppuccin surface.
+    r,g,b=[min(230,round(v*0.60+90)) for v in (r,g,b)]
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def recolor(accent):
+    state=HOME / ".config/chromebook/last-accent"
+    old=state.read_text().strip() if state.exists() else "#89b4fa"
+    paths=[
+        ".config/waybar/style.css", ".config/wofi/launcher.css",
+        ".config/wofi/cheatsheet.css", ".config/wofi/power.css",
+        ".config/mako/config", ".config/chromebook/quick-settings.css",
+    ]
+    for rel in paths:
+        path=HOME / rel
+        if not path.is_file():
+            continue
+        content=path.read_text()
+        new=re.sub(re.escape(old), accent, content, flags=re.I)
+        new=re.sub(re.escape("#89b4fa"), accent, new, flags=re.I)
+        if new!=content:
+            path.write_text(new)
+    # Kitty remains usable with its own theme; only set accent hints.
+    kitty=HOME / ".config/kitty/kitty.conf"
+    kitty.parent.mkdir(parents=True,exist_ok=True)
+    body=kitty.read_text() if kitty.exists() else ""
+    body=re.sub(r"\n?# Chromebook accent start.*?# Chromebook accent end\n?", "",body,flags=re.S)
+    body+=f"\n# Chromebook accent start\ncursor {accent}\nactive_border_color {accent}\n# Chromebook accent end\n"
+    kitty.write_text(body)
+    state.write_text(accent+"\n")
+    subprocess.run(["makoctl","reload"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill","-x","waybar"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    with (HOME/".cache/waybar-hyprland.log").open("a") as log:
+        subprocess.Popen(["waybar"],stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
+
+class Picker(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook Wallpapers")
+        self.set_default_size(820,560)
+        self.set_border_width(15)
+        self.connect("destroy",Gtk.main_quit)
+        self.connect("key-press-event",lambda _,e:self.destroy() if e.keyval==Gdk.KEY_Escape else False)
+        box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=9)
+        self.add(box)
+        header=Gtk.Box(spacing=8)
+        box.pack_start(header,False,False,0)
+        title=Gtk.Label(label="󰸉  Wallpapers")
+        header.pack_start(title,True,True,0)
+        self.auto=Gtk.CheckButton(label="Match accent colors to wallpaper")
+        self.auto.set_active(True)
+        header.pack_start(self.auto,False,False,0)
+        add=Gtk.Button(label="Import image…")
+        add.connect("clicked",self.import_image)
+        header.pack_start(add,False,False,0)
+        self.info=Gtk.Label(label="Choose an image below. No wallpapers are shipped with this project.")
+        self.info.set_xalign(0)
+        box.pack_start(self.info,False,False,0)
+        scroll=Gtk.ScrolledWindow()
+        box.pack_start(scroll,True,True,0)
+        self.flow=Gtk.FlowBox()
+        self.flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.flow.set_max_children_per_line(4)
+        self.flow.set_row_spacing(12)
+        self.flow.set_column_spacing(12)
+        self.flow.connect("child-activated",self.apply)
+        scroll.add(self.flow)
+        self.refresh()
+        self.show_all()
+
+    def refresh(self):
+        for child in list(self.flow.get_children()):
+            self.flow.remove(child)
+        for path in sorted(WALLS.iterdir()):
+            if not path.is_file() or path.suffix.lower() not in EXTS:
+                continue
+            try: pix=GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path),175,110,True)
+            except Exception: continue
+            card=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=6)
+            card.pack_start(Gtk.Image.new_from_pixbuf(pix),False,False,0)
+            label=Gtk.Label(label=path.name[:28])
+            card.pack_start(label,False,False,0)
+            item=Gtk.FlowBoxChild()
+            item.path=path
+            item.add(card)
+            self.flow.add(item)
+        self.flow.show_all()
+
+    def import_image(self,_button):
+        chooser=Gtk.FileChooserDialog(title="Choose an image",parent=self,action=Gtk.FileChooserAction.OPEN)
+        chooser.add_buttons(Gtk.STOCK_CANCEL,Gtk.ResponseType.CANCEL,Gtk.STOCK_OPEN,Gtk.ResponseType.OK)
+        filter=Gtk.FileFilter()
+        filter.set_name("Images")
+        for ext in ("*.png","*.jpg","*.jpeg","*.webp","*.jxl"):filter.add_pattern(ext)
+        chooser.add_filter(filter)
+        response=chooser.run()
+        selected=Path(chooser.get_filename()) if response==Gtk.ResponseType.OK else None
+        chooser.destroy()
+        if selected and selected.is_file():
+            target=WALLS / selected.name
+            if target.resolve()!=selected.resolve():
+                if target.exists():
+                    target=WALLS / (selected.stem+"-"+datetime.now().strftime("%H%M%S")+selected.suffix)
+                shutil.copy2(selected,target)
+            self.refresh()
+
+    def apply(self,_flow,child):
+        image=child.path
+        try:
+            result=run([str(HOME/".local/bin/hypr-set-wallpaper"),str(image)])
+            if result.returncode:
+                self.info.set_text("Wallpaper error: "+result.stderr[:150])
+                return
+            if self.auto.get_active():
+                recolor(accent_from_image(image))
+            self.info.set_text("Applied: "+image.name)
+        except Exception as exc:
+            self.info.set_text("Could not apply wallpaper: "+str(exc)[:100])
+
+if __name__=="__main__":
+    Picker()
+    Gtk.main()

@@ -269,6 +269,13 @@ hl.gesture({
     direction = "horizontal",
     action = "workspace"
 })
+-- Four fingers up: visual window overview, down: scratchpad workspace.
+hl.gesture({ fingers = 4, direction = "up", action = function()
+    hl.exec_cmd("@HOME@/.local/bin/hypr-overview-grid")
+end })
+hl.gesture({ fingers = 4, direction = "down", action = "special", workspace_name = "magic" })
+-- Three-finger pinch zooms the desktop around the cursor.
+hl.gesture({ fingers = 3, direction = "pinch", action = "cursor_zoom", zoom_level = 1, mode = "live" })
 
 -- Example per-device config
 -- See https://wiki.hypr.land/configuring/core/devices/ for more
@@ -302,6 +309,12 @@ hl.bind("SUPER + N", hl.dsp.exec_cmd("makoctl restore"))
 hl.bind("SUPER + SHIFT + N", hl.dsp.exec_cmd("makoctl mode -t do-not-disturb"))
 -- Clipboard history preserves text and image MIME types for Ctrl+V.
 hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-clipboard"))
+-- Chromebook-specific utilities; no function keys needed.
+hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-quick-settings"))
+hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-picker"))
+hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
+hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record start region"))
+hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record stop"))
 -- Example binds, see https://wiki.hypr.land/configuring/core/binds/ for more
 -- Quick application launches (Search/Super key on Chromebook).
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("firefox"))  -- Browser
@@ -356,13 +369,13 @@ end)
 hl.bind("XF86FullScreen", function()
     hl.dispatch(hl.dsp.window.fullscreen({ action = "toggle", mode = "fullscreen" }))
 end)
-hl.bind("XF86LaunchA", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-window-overview"))
+hl.bind("XF86LaunchA", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-overview-grid"))
 -- Chromebook screenshot key emits Print even though it is marked with a camera icon.
 hl.bind("Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-copy"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-save"))
 hl.bind("CTRL + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot full-copy"))
 -- A keyboard fallback to the same overview/window picker.
-hl.bind("SUPER + Tab", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-window-overview"))
+hl.bind("SUPER + Tab", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-overview-grid"))
 
 -- The physical lock/power key is handled by hardware/logind; leave it unchanged
 -- to avoid accidentally shutting down or suspending this running laptop.
@@ -413,6 +426,18 @@ hl.window_rule({
     name = "discord-workspace-3",
     match = { class = "^(discord|Discord)$" },
     workspace = "3",
+})
+-- Keep utility windows floating, centered and comfortably sized.
+hl.window_rule({
+    name = "float-small-utilities",
+    match = { class = "^(org[.]gnome[.]Calculator|gnome-calculator|qalculate-gtk|pavucontrol|nm-connection-editor)$" },
+    float = true, center = true, size = "820 540",
+})
+-- Native file chooser titles when exported as separate windows.
+hl.window_rule({
+    name = "float-file-choosers",
+    match = { title = "^(Open File|Save File|Select a File|Choose Files)$" },
+    float = true, center = true,
 })
 
 -- Example window rules that are useful

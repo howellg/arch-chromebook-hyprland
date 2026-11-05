@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Non-invasive Chromebook compatibility checker. Never prints device secrets."""
+import json
+import os
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import sys
+
+def text(path,default="unknown"):
+    try:return Path(path).read_text().strip()
+    except OSError:return default
+def run(*args):
+    try:return subprocess.run(args,capture_output=True,text=True,timeout=3).stdout.strip()
+    except (OSError,subprocess.TimeoutExpired):return ""
+def files(path):
+    return sorted(p.name for p in Path(path).iterdir()) if Path(path).exists() else []
+def dmi(name):
+    return text("/sys/class/dmi/id/"+name)
+def battery():
+    return [p.name for p in Path("/sys/class/power_supply").glob("*") if (p/"type").is_file() and text(p/"type")=="Battery"]
+def key_support():
+    try:
+        # Kernel evdev KEY_* codes used by Chromebook top-row keys
+        keyboard=next((x for x in Path("/sys/class/input").glob("event*") if "keyboard" in text(x/"device/name", "").lower()), None)
+        if keyboard is None:return {}
+        words=(keyboard/"device/capabilities/key").read_text().split()
+        bits=int("".join(x.zfill(16) for x in words),16)
+        names={158:"Back",173:"Refresh",372:"Fullscreen",120:"Overview",99:"Screenshot",
+               224:"BrightnessDown",225:"BrightnessUp",113:"Mute",114:"VolumeDown",115:"VolumeUp"}
+        return {name:bool(bits>>code &1) for code,name in names.items()}
+    except (OSError,ValueError):return {}
+def graphics():
+    raw=run("lspci")
+    return [line.split(": ",1)[-1] for line in raw.splitlines()
+            if any(w in line.lower() for w in ("vga compatible","3d controller","display controller"))]
+def audio():
+    raw=run("lspci")
+    return [line.split(": ",1)[-1] for line in raw.splitlines()
+            if "audio device" in line.lower() or "multimedia audio" in line.lower()]
+def installed(name):return shutil.which(name) is not None
+
+report={
+    "manufacturer": dmi("sys_vendor"),
+    "model": dmi("product_name"),
+    "architecture":platform.machine(),
+    "kernel":platform.release(),
+    "hyprland_installed":installed("hyprctl"),
+    "hyprland_version":run("hyprctl","version").splitlines()[0] if installed("hyprctl") else "",
+    "gpu":graphics(),
+    "audio_controllers":audio(),
+    "battery_devices":battery(),
+    "backlight_devices":files("/sys/class/backlight"),
+    "keyboard_top_row":key_support(),
+    "power_profiles_available":installed("powerprofilesctl"),
+    "screen_capture_dependencies":{a:installed(a) for a in ("grim","slurp","wf-recorder")},
+    "desktop_dependencies":{a:installed(a) for a in ("waybar","wofi","mako","hyprsunset","nmcli","bluetoothctl")},
+    "notes":["Do not assume all Chromebooks use BAT0 or Intel backlight.",
+             "Keyboard event numbers and mapped keysyms differ by Chromebook model.",
+             "Audio support varies by codec; check chromebook-linux-audio device support.",
+             "Do not publish serial numbers or MAC addresses."],
+}
+if "--json" in sys.argv:
+    print(json.dumps(report,indent=2))
+else:
+    print("Chromebook Hyprland compatibility report")
+    for key,value in report.items():
+        if isinstance(value,list):
+            print(f"{key}: {', '.join(str(v) for v in value)}")
+        elif isinstance(value,dict):
+            print(key+":")
+            for k,v in value.items():print("  "+str(k)+": "+str(v))
+        else:
+            print(f"{key}: {value}")

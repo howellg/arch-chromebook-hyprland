@@ -1,0 +1,9 @@
+[Unit]
+Description=Apply Chromebook power profile when AC state changes
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=3min
+AccuracySec=25s
+Unit=chromebook-power-profile.service
+[Install]
+WantedBy=timers.target

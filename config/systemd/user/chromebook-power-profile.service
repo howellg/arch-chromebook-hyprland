@@ -1,0 +1,6 @@
+[Unit]
+Description=Apply Chromebook automatic power profile
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hypr-power-profile apply

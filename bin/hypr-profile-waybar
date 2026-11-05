@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Small Waybar status indicator for tuned power profiles.
+mode=$(powerprofilesctl get 2>/dev/null || echo unavailable)
+case "$mode" in
+  power-saver) printf '󰌪  Saver';;
+  balanced) printf '󰾆  Balanced';;
+  performance) printf '󰓅  Fast';;
+  *) printf '󱐥  Power';;
+esac

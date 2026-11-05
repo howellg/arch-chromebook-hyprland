@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Chromebook power profile manager. Auto = balanced on AC, saver on battery.
+set -euo pipefail
+state="$HOME/.config/chromebook/power-mode"
+mkdir -p "$(dirname "$state")"
+mode=$(cat "$state" 2>/dev/null || echo auto)
+requested="${1-__UNSET__}"
+if [[ "$requested" != "__UNSET__" ]]; then
+    case "$requested" in
+        auto|power-saver|balanced|performance)
+            mode="$requested"
+            printf '%s\n' "$mode" > "$state" ;;
+        apply|status) : ;;
+        *) echo "Usage: hypr-power-profile {auto|power-saver|balanced|performance|apply|status}" >&2; exit 2 ;;
+    esac
+fi
+if [[ "$requested" == status ]]; then
+    echo "Policy: $mode"
+    powerprofilesctl get
+    exit 0
+fi
+profile="$mode"
+if [[ "$mode" == auto ]]; then
+    ac=$(cat /sys/class/power_supply/AC/online 2>/dev/null || echo 1)
+    [[ "$ac" == 1 ]] && profile=balanced || profile=power-saver
+fi
+current=$(powerprofilesctl get 2>/dev/null || echo unknown)
+if [[ "$current" != "$profile" ]]; then
+    powerprofilesctl set "$profile" || exit 1
+fi
+if [[ "$requested" != apply && "$requested" != "__UNSET__" ]]; then
+    notify-send -a "Chromebook power" -t 2000 "Power profile: $profile" "Policy: $mode"
+fi

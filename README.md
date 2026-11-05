@@ -1,6 +1,6 @@
 # Arch Chromebook Hyprland (Kano rev3)
 
-A Chromebook-oriented Hyprland desktop for **Arch Linux** alongside existing KDE Plasma. Uses Catppuccin-inspired Waybar, translucent Wofi menus, Mako, Hyprlock, clipboard history and a low-battery timer.
+A Chromebook-oriented Hyprland desktop for **Arch Linux** alongside existing KDE Plasma. Includes Catppuccin-inspired Waybar, a visual quick-settings panel, wallpaper and accent-color picker, annotated screenshots, touchpad gestures, power profiles, clipboard history, hardware detection, and battery alerts.
 
 **Status:** Work in progress. Tested on Acer Chromebook Kano rev3, Intel Core i5-1235U, 1920×1200, Arch Linux, **Hyprland 0.57.x (Lua configuration)**. Other Chromebooks may have different input mappings, battery names, backlights and audio.
 
@@ -14,7 +14,12 @@ A Chromebook-oriented Hyprland desktop for **Arch Linux** alongside existing KDE
 - Clipboard history for text and images (Super+Shift+V)
 - Lock after 5 minutes, display off after 10 minutes, lock before suspend
 - Battery warnings at 20%, 10%, 5%; no unattended suspend by default
-- Optional Hyprsunset night light: neutral after 07:00, 4800K after 20:30
+- Hyprsunset night light: neutral after 07:00, 4800K after 20:30
+- Quick Settings panel with Wi-Fi, Bluetooth, power, volume, and brightness controls
+- Visual wallpaper picker with generated colors across Waybar, Wofi, Mako, Kitty, and GTK
+- Annotated screenshots, optional screen recording, and gesture-based visual overview
+- Automatic Power Saver on battery and Balanced on AC, with manual override
+- Hardware compatibility report for other Chromebooks
 - Workspace assignment: Firefox 1, VS Code 2, Discord 3
 - Fish Fastfetch greeting and shell theme (optional; custom prompt excluded pending license review)
 
@@ -26,13 +31,15 @@ Install on a working Arch Linux desktop (not a live USB). Official repository pa
       waybar wofi mako hyprlock hypridle hyprpaper \
       hyprpolkitagent hyprlauncher wl-clipboard cliphist \
       grim slurp brightnessctl playerctl network-manager-applet \
-      pavucontrol xdg-desktop-portal xdg-desktop-portal-hyprland \
+      pavucontrol python-gobject python-cairo gtk3 power-profiles-daemon \
+      xdg-desktop-portal xdg-desktop-portal-hyprland \
       xdg-desktop-portal-gtk hyprsunset
 
 Firefox, Discord and VS Code are optional shortcuts; their commands must exist (firefox, discord, code). VS Code may come from AUR or vendor packaging, not necessarily official Arch repositories.
 
-## Install
+Optional video recording requires `wf-recorder` (`sudo pacman -S --needed wf-recorder`). See the **[Feature guide](docs/FEATURES.md)** for instructions on wallpaper theming, gestures, power modes, and the visual tools.
 
+## Install
 
     git clone https://github.com/howellg/arch-chromebook-hyprland.git
     cd arch-chromebook-hyprland
@@ -73,6 +80,11 @@ On Chromebooks, Super usually means the Search/Launcher key. Search the full liv
 | Super+1..0 | Switch workspaces 1–10 |
 | Super+Shift+1..0 | Move window to workspace |
 | Super+Shift+N | Toggle Do Not Disturb |
+| Super+Shift+Q | Quick Settings |
+| Super+Shift+W | Wallpaper picker |
+| Super+Shift+P | Annotate screenshot |
+| Super+Shift+R | Start region recording (needs wf-recorder) |
+| Super+Shift+T | Stop recording |
 
 ## Desktop Commander on workspace 9 (optional)
 
@@ -122,13 +134,14 @@ Disable the two wl-paste autostart lines in hyprland.lua to stop new history cap
 ## Structure
 
 - config/hypr: Lua compositor config, lock, idle and night-light profiles
+- config/chromebook: GTK Quick Settings theme
 - config/waybar: bar layout and CSS
 - config/wofi: launcher, cheatsheet and power-menu themes
 - config/mako: notification theme
 - config/cliphist: clipboard retention limits
 - config/fish: optional greeting and shell theme (no private variables or third-party custom prompt)
-- config/systemd/user: battery timer
+- config/systemd/user: battery timer and automatic AC power-profile timer
 - bin: session helper scripts
 - docs/TESTING.md: manual verification and safety checklist
 
-The working machine uses default Kitty settings; there is no Kitty override in this snapshot.
+The working machine initially uses default Kitty settings; selecting a wallpaper can apply an accent-only Kitty override.

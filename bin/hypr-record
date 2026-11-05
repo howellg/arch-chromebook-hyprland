@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Record Wayland video via wf-recorder (one optional Arch package).
+set -euo pipefail
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+pidfile="$runtime/hypr-chromebook-recording.pid"
+videos="$HOME/Videos/Recordings"
+mkdir -p "$videos"
+valid_pid() {
+  [[ -f "$pidfile" ]] || return 1
+  local pid
+  pid=$(cat "$pidfile" 2>/dev/null || :)
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  [[ -r "/proc/$pid/cmdline" ]] || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" | grep -q 'wf-recorder'
+}
+notify() { notify-send -a "Chromebook recorder" "$@"; }
+case "${1:-status}" in
+  status)
+    if valid_pid; then echo "Recording (PID $(cat "$pidfile"))"; else echo "Not recording"; fi ;;
+  stop)
+    if valid_pid; then
+      kill -INT "$(cat "$pidfile")"
+      rm -f "$pidfile"
+      notify "Recording stopped" "Saved under ~/Videos/Recordings"
+    else
+      rm -f "$pidfile"
+      notify "No active recording"
+    fi ;;
+  start)
+    if ! command -v wf-recorder >/dev/null 2>&1; then
+      notify "Screen recording needs wf-recorder" "Install with: sudo pacman -S wf-recorder"
+      echo 'Install wf-recorder: sudo pacman -S --needed wf-recorder' >&2
+      exit 1
+    fi
+    if valid_pid; then notify "Already recording"; exit 0; fi
+    out="$videos/Recording_$(date +%Y-%m-%d_%H-%M-%S).mp4"
+    args=(-f "$out")
+    if [[ "${2:-region}" == region ]]; then
+      geometry=$(slurp) || exit 0
+      [[ -n "$geometry" ]] || exit 0
+      args+=(-g "$geometry")
+    elif [[ "${2:-region}" != full ]]; then
+      echo 'Usage: hypr-record start [region|full] | stop | status' >&2
+      exit 2
+    fi
+    nohup wf-recorder "${args[@]}" > "$HOME/.cache/hypr-recorder.log" 2>&1 </dev/null &
+    echo "$!" > "$pidfile"
+    sleep 0.5
+    if valid_pid; then
+      notify "Recording started" "Press Super+Shift+T to stop"
+    else
+      rm -f "$pidfile"
+      notify "Recording could not start" "See ~/.cache/hypr-recorder.log"
+      exit 1
+    fi ;;
+  *) echo 'Usage: hypr-record start [region|full] | stop | status' >&2; exit 2 ;;
+esac
