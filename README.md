@@ -132,7 +132,3 @@ Disable the two wl-paste autostart lines in hyprland.lua to stop new history cap
 - docs/TESTING.md: manual verification and safety checklist
 
 The working machine uses default Kitty settings; there is no Kitty override in this snapshot.
-
-## Before publishing
-
-Review all files for private addresses, user names, tokens, references, and **third-party Fish prompt licensing**. A license can be added later after reviewing provenance and selecting terms. This project folder is local only, not pushed to GitHub.
