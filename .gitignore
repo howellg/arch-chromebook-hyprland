@@ -1,0 +1,23 @@
+# Never publish private machine state
+.env
+.env.*
+*.log
+*.bak
+*.bak.*
+*.tmp
+*~
+.DS_Store
+__pycache__/
+*.pyc
+secrets/
+private/
+local/
+screenshots/
+backups/
+*.pem
+*.key
+id_*
+*.sqlite
+*.db
+*.cache
+fish_variables
