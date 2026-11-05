@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Per-session Class / Presentation desktop modes. Explicitly reversible.
+set -euo pipefail
+dir="$HOME/.config/chromebook"
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="$dir/desktop-mode"
+saved="$runtime/chromebook-mode-saved"
+inhibit_pid="$runtime/chromebook-presentation-inhibit.pid"
+mkdir -p "$dir"
+
+valid_inhibit() {
+  [[ -r "$inhibit_pid" ]] || return 1
+  local pid; pid=$(cat "$inhibit_pid" || :)
+  [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null
+}
+stop_inhibit() {
+  if valid_inhibit; then
+    kill "$(cat "$inhibit_pid")" 2>/dev/null || :
+  fi
+  rm -f "$inhibit_pid"
+}
+restore() {
+  stop_inhibit
+  if [[ -r "$saved" ]]; then
+    old_power=$(sed -n '1p' "$saved")
+    old_dnd=$(sed -n '2p' "$saved")
+    if [[ -n "$old_power" ]]; then
+      "$HOME/.local/bin/hypr-power-profile" "$old_power" >/dev/null 2>&1 || :
+    fi
+    if [[ "$old_dnd" == off ]]; then
+      makoctl mode -r do-not-disturb >/dev/null 2>&1 || :
+    fi
+    rm -f "$saved"
+  fi
+}
+mode=$(cat "$state" 2>/dev/null || echo normal)
+case "${1:-status}" in
+  status) printf '%s\n' "$mode" ;;
+  normal|class|presentation)
+    desired="$1"
+    [[ "$mode" != "$desired" ]] || exit 0
+    if [[ "$mode" != normal ]]; then restore; fi
+    if [[ "$desired" != normal ]]; then
+      power=$(cat "$dir/power-mode" 2>/dev/null || echo auto)
+      case "$power" in auto|power-saver|balanced|performance) : ;; *) power=auto ;; esac
+      if makoctl mode | grep -qx 'do-not-disturb'; then dnd=on; else dnd=off; fi
+      printf '%s\n%s\n' "$power" "$dnd" > "$saved"
+    fi
+    case "$desired" in
+      class)
+        makoctl mode -a do-not-disturb >/dev/null
+        "$HOME/.local/bin/hypr-power-profile" power-saver >/dev/null || :
+        ;;
+      presentation)
+        makoctl mode -a do-not-disturb >/dev/null
+        "$HOME/.local/bin/hypr-power-profile" balanced >/dev/null || :
+        # hypridle honors logind's idle inhibitors. Does not block manual lock.
+        nohup systemd-inhibit --what=idle --mode=block --who=Chromebook-Presentation \
+          --why="Slides and screen presentation" sleep infinity \
+          > "$runtime/chromebook-presentation.log" 2>&1 </dev/null &
+        echo "$!" > "$inhibit_pid"
+        ;;
+    esac
+    printf '%s\n' "$desired" > "$state"
+    notify-send -a "Chromebook modes" -t 2500 "Desktop mode: $desired"
+    ;;
+  *) echo 'Usage: hypr-desktop-mode {normal|class|presentation|status}' >&2; exit 2 ;;
+esac

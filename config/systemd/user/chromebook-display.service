@@ -1,0 +1,5 @@
+[Unit]
+Description=Apply Chromebook saved monitor profile when matching outputs connect
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hypr-display-profile auto apply

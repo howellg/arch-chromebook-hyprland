@@ -36,7 +36,7 @@ hl.monitor({
 
 -- Set programs that you use
 local terminal    = "kitty"
-local fileManager = "dolphin"
+local fileManager = "env QT_QPA_PLATFORMTHEME=kde dolphin" -- Force KDE palette even before next Hyprland login
 local menu = "@HOME@/.local/bin/hypr-app-launcher"
 
 
@@ -54,6 +54,11 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("nm-applet")
     hl.exec_cmd("waybar")
     hl.exec_cmd("hypridle")
+    -- Presentation/Class Mode is session-scoped; restore normal after login.
+    hl.exec_cmd("@HOME@/.local/bin/hypr-desktop-mode normal")
+    -- KDE Connect tray and optional app-only layout restore after desktop startup.
+    hl.exec_cmd("kdeconnect-indicator")
+    hl.exec_cmd("sh -c 'sleep 6; @HOME@/.local/bin/hypr-session-layout auto apply'")
     -- Desktop Commander remote bridge in Kitty, assigned to workspace 9.
     hl.exec_cmd("@HOME@/.local/bin/hypr-desktop-commander")
     -- Two Wayland clipboard observers: text and images (local history).
@@ -74,6 +79,9 @@ end)
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
+-- Use KDE platform theme for Qt6 apps (Dolphin, file dialogs) inside Hyprland.
+-- Prevent dark Dolphin backgrounds with incorrectly black text.
+hl.env("QT_QPA_PLATFORMTHEME", "kde")
 
 
 -----------------------
@@ -315,6 +323,12 @@ hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-p
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record start region"))
 hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record stop"))
+-- Study / presentation modes and the notification + device centers.
+hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-desktop-mode class"))
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-desktop-mode presentation"))
+hl.bind("SUPER + SHIFT + B", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-desktop-mode normal"))
+hl.bind("SUPER + SHIFT + H", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-notifications"))
+hl.bind("SUPER + SHIFT + K", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-devices"))
 -- Example binds, see https://wiki.hypr.land/configuring/core/binds/ for more
 -- Quick application launches (Search/Super key on Chromebook).
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("firefox"))  -- Browser

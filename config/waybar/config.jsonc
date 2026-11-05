@@ -120,8 +120,10 @@
     "custom/settings": {
         "format": "󰒓",
         "tooltip": true,
-        "tooltip-format": "Quick settings · Super+Shift+Q",
-        "on-click": "@HOME@/.local/bin/hypr-quick-settings"
+        "tooltip-format": "Quick Settings: left click\nNotification Center: right click\nConnected devices: middle click",
+        "on-click": "@HOME@/.local/bin/hypr-quick-settings",
+        "on-click-right": "@HOME@/.local/bin/hypr-notifications",
+        "on-click-middle": "@HOME@/.local/bin/hypr-devices"
     },
     "custom/power-profile": {
         "exec": "@HOME@/.local/bin/hypr-profile-waybar",

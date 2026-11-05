@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Manage saved Hyprland monitor arrangements; only apply on explicit request."""
+from pathlib import Path
+import subprocess
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk
+HOME=Path.home()
+CLI=str(HOME/".local/bin/hypr-display-profile")
+def command(*args):
+    try:
+        p=subprocess.run([CLI,*args],capture_output=True,text=True,timeout=6)
+        return p.returncode,(p.stdout+p.stderr).strip()
+    except (OSError,subprocess.TimeoutExpired) as e:return 1,str(e)
+class Displays(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · Display Layouts")
+        self.set_default_size(570,470);self.set_border_width(15)
+        self.connect("destroy",Gtk.main_quit)
+        box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=9);self.add(box)
+        title=Gtk.Label(label="External Monitor Profiles")
+        box.pack_start(title,False,False,0)
+        details=Gtk.Label(label="Save the current display arrangement. Only matching connected outputs can be restored, protecting the built-in screen.")
+        details.set_xalign(0);details.set_line_wrap(True)
+        box.pack_start(details,False,False,0)
+        self.names=Gtk.ComboBoxText();box.pack_start(self.names,False,False,0)
+        self.refresh()
+        self.new=Gtk.Entry();self.new.set_placeholder_text("New name: laptop, projector, dock...")
+        box.pack_start(self.new,False,False,0)
+        for label,cb in (("Save current arrangement",self.save),("Apply selected profile",self.apply),
+                         ("Enable auto restore on matching outputs",self.auto_on),
+                         ("Disable auto restore",self.auto_off)):
+            btn=Gtk.Button(label=label);btn.connect("clicked",cb);box.pack_start(btn,False,False,0)
+        self.status=Gtk.Label(label="Changes are never applied automatically until you enable matching-display restore.")
+        self.status.set_line_wrap(True);box.pack_start(self.status,False,False,0)
+        self.show_all()
+    def refresh(self):
+        self.names.remove_all()
+        _,output=command("list")
+        for line in output.splitlines():
+            if " (" in line:self.names.append_text(line.split(" (",1)[0])
+        self.names.set_active(0)
+    def save(self,*_):
+        name=self.new.get_text().strip()
+        if not name:return
+        _,message=command("save",name);self.status.set_text(message[:270]);self.refresh()
+    def apply(self,*_):
+        name=self.names.get_active_text()
+        if not name:return
+        prompt=Gtk.MessageDialog(transient_for=self,message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.YES_NO,text="Apply the saved monitor arrangement?")
+        prompt.format_secondary_text("Display positions, scale, and resolution may change. The profile must match all connected outputs.")
+        answer=prompt.run();prompt.destroy()
+        if answer==Gtk.ResponseType.YES:
+            _,message=command("apply",name);self.status.set_text(message[:270])
+    def auto_on(self,*_):
+        _,message=command("auto","on");self.status.set_text(message or "Automatic matching-display restore enabled.")
+    def auto_off(self,*_):
+        _,message=command("auto","off");self.status.set_text(message or "Automatic display restoration disabled.")
+Displays();Gtk.main()

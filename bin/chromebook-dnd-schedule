@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Scheduled Mako quiet hours. Off by default; doesn't override Class Mode."""
+from pathlib import Path
+import datetime
+import subprocess
+import os
+import sys
+home=Path.home()
+conf=home/".config/chromebook/dnd-schedule"
+state=Path(os.environ.get("XDG_RUNTIME_DIR",f"/run/user/{os.getuid()}"))/"chromebook-scheduled-dnd"
+def mako(*args):
+    try:return subprocess.run(["makoctl",*args],capture_output=True,text=True,timeout=3)
+    except (OSError,subprocess.TimeoutExpired):return None
+if "--status" in sys.argv:
+    print(conf.read_text().strip() if conf.is_file() else "off")
+    sys.exit(0)
+config=conf.read_text().strip() if conf.is_file() else "off"
+mode=(home/".config/chromebook/desktop-mode")
+if mode.is_file() and mode.read_text().strip()!="normal":
+    sys.exit(0)
+if config=="off":
+    if state.exists():
+        mako("mode","-r","do-not-disturb")
+        state.unlink(missing_ok=True)
+    sys.exit(0)
+try:
+    begin,end=config.split()
+    start=datetime.time.fromisoformat(begin)
+    finish=datetime.time.fromisoformat(end)
+except ValueError:
+    sys.exit("DND schedule format: HH:MM HH:MM or off")
+now=datetime.datetime.now().time()
+active=start<=now<finish if start<=finish else (now>=start or now<finish)
+m=mako("mode")
+already=bool(m and "do-not-disturb" in m.stdout.splitlines())
+if active and not state.exists() and not already:
+    r=mako("mode","-a","do-not-disturb")
+    if r and r.returncode==0:state.touch()
+elif not active and state.exists():
+    mako("mode","-r","do-not-disturb")
+    state.unlink(missing_ok=True)

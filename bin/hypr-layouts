@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Manage safe app-only session layouts, including optional auto-restoration."""
+import subprocess
+from pathlib import Path
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk
+HOME=Path.home()
+CLI=str(HOME/".local/bin/hypr-session-layout")
+def command(*args):
+    try:
+        p=subprocess.run([CLI,*args],capture_output=True,text=True,timeout=6)
+        return (p.stdout or p.stderr).strip()
+    except (OSError,subprocess.TimeoutExpired):return "Command unavailable."
+class Layouts(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · App Layouts")
+        self.set_default_size(520,430);self.set_border_width(15)
+        self.connect("destroy",Gtk.main_quit)
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10);self.add(root)
+        label=Gtk.Label(label="Named app layouts (apps only; no tabs, documents or terminal content)")
+        label.set_line_wrap(True);root.pack_start(label,False,False,0)
+        self.name=Gtk.Entry();self.name.set_placeholder_text("Layout name (study, programming, personal...)")
+        root.pack_start(self.name,False,False,0)
+        self.options=Gtk.ComboBoxText()
+        self.refresh_names()
+        root.pack_start(self.options,False,False,0)
+        for text,fn in (("Restore selected layout",self.restore),("Save current apps as named layout",self.save),
+                        ("Restore selected layout automatically on login",self.enable_auto),
+                        ("Disable restoration at login",self.disable_auto)):
+            b=Gtk.Button(label=text);b.connect("clicked",fn);root.pack_start(b,False,False,0)
+        self.status=Gtk.Label(label="No actions are taken until you select an option.")
+        self.status.set_line_wrap(True);root.pack_start(self.status,False,False,0)
+        self.show_all()
+    def selected(self):return self.options.get_active_text()
+    def refresh_names(self):
+        self.options.remove_all()
+        for line in command("list").splitlines():
+            name=line.split(":",1)[0].strip()
+            if name:self.options.append_text(name)
+        self.options.set_active(0)
+    def restore(self,*_):
+        if self.selected():self.status.set_text(command("restore",self.selected()) or "Already-running apps were left untouched.")
+    def save(self,*_):
+        name=self.name.get_text().strip()
+        if name:
+            self.status.set_text(command("save",name));self.refresh_names()
+    def enable_auto(self,*_):
+        if self.selected():
+            self.status.set_text(command("auto",self.selected()) or "Auto-restore enabled for next login.")
+    def disable_auto(self,*_):
+        self.status.set_text(command("auto","off") or "Auto-restore disabled.")
+Layouts();Gtk.main()

@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Safe named Hyprland Lua monitor profiles; no automatic monitor changes by default."""
+from pathlib import Path
+import subprocess
+import json
+import re
+import sys
+import os
+HOME=Path.home()
+ROOT=HOME/".config/chromebook/displays"
+ROOT.mkdir(parents=True,exist_ok=True)
+AUTO=HOME/".config/chromebook/display-auto"
+LAST=Path(os.environ.get("XDG_RUNTIME_DIR",f"/run/user/{os.getuid()}"))/"chromebook-display-last"
+def call(*argv):
+    p=subprocess.run(argv,capture_output=True,text=True,timeout=5)
+    if p.returncode:return None
+    return p.stdout
+def monitors():
+    return json.loads(call("hyprctl","monitors","-j") or "[]")
+def safe(name):
+    if not re.fullmatch("[A-Za-z0-9_-]+",name):raise SystemExit("Names must be letters, digits, dash or underscore.")
+    return ROOT/(name+".json")
+def capture():
+    data=[]
+    for m in monitors():
+        if m.get("disabled"):continue
+        data.append({"output":m["name"],"mode":f'{m["width"]}x{m["height"]}@{m["refreshRate"]:.2f}',
+                     "position":f'{m["x"]}x{m["y"]}',"scale":m["scale"]})
+    return sorted(data,key=lambda x:x["output"])
+def get(name):
+    p=safe(name)
+    if not p.is_file():raise SystemExit("No such saved display profile: "+name)
+    obj=json.loads(p.read_text())
+    if obj.get("version")!=1:raise SystemExit("Unsupported profile version")
+    return obj.get("monitors",[])
+def signature(layout):return "|".join(sorted(m["output"] for m in layout))
+def apply(name, auto=False):
+    layout=get(name)
+    now=capture()
+    if signature(layout)!=signature(now):
+        raise SystemExit("Connected displays do not match profile; refusing to disable/reassign screens.")
+    if auto and LAST.is_file() and LAST.read_text().strip()==name+":"+signature(now):return
+    for item in layout:
+        if not re.fullmatch("[A-Za-z0-9_.-]+",item["output"]):continue
+        mode=item["mode"]
+        pos=item["position"]
+        scale=float(item["scale"])
+        if not re.fullmatch(r"\d+x\d+@\d+(?:\.\d+)?",mode) or not re.fullmatch(r"-?\d+x-?\d+",pos) or scale<0.5 or scale>4:
+            raise SystemExit("Unsafe monitor mode, position, or scale.")
+        # Hyprland 0.57 Lua monitor API. No shell evaluation or untrusted Lua strings.
+        expr=f'hl.monitor({{output="{item["output"]}",mode="{mode}",position="{pos}",scale={scale}}})'
+        result=subprocess.run(["hyprctl","eval",expr],capture_output=True,text=True,timeout=5)
+        if result.returncode!=0 or "error" in result.stdout.lower():
+            raise SystemExit(f"Cannot apply {item['output']}: "+(result.stdout+result.stderr)[:250])
+    LAST.write_text(name+":"+signature(now)+"\n")
+    print("Applied display profile:",name)
+def main(args):
+    if not args or args[0]=="list":
+        print("\n".join(p.stem+" ("+signature(get(p.stem))+")" for p in sorted(ROOT.glob("*.json"))) or "No profiles yet")
+    elif args[0]=="save" and len(args)==2:
+        layout=capture();p=safe(args[1]);p.write_text(json.dumps({"version":1,"monitors":layout},indent=2)+"\n")
+        print("Saved:",p)
+    elif args[0]=="apply" and len(args)==2:apply(args[1])
+    elif args[0]=="auto":
+        if len(args)==2 and args[1] in ("on","off"):
+            AUTO.write_text(args[1]+"\n")
+            subprocess.run(["systemctl","--user","enable" if args[1]=="on" else "disable",
+                            "--now","chromebook-display.timer"],capture_output=True,timeout=5)
+        elif len(args)==2 and args[1]=="apply":
+            if AUTO.is_file() and AUTO.read_text().strip()=="on":
+                sig=signature(capture())
+                for p in ROOT.glob("*.json"):
+                    if signature(get(p.stem))==sig:
+                        apply(p.stem,auto=True)
+                        break
+        else:print(AUTO.read_text().strip() if AUTO.is_file() else "off")
+    else:raise SystemExit("Usage: hypr-display-profile {list|save NAME|apply NAME|auto [on|off|apply]}")
+if __name__=="__main__":main(sys.argv[1:])

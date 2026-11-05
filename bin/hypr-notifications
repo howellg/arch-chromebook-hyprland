@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Mako notifications center and optional scheduled quiet hours."""
+from pathlib import Path
+import subprocess, json, re
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk
+HOME=Path.home()
+SCHEDULE=HOME/".config/chromebook/dnd-schedule"
+def call(*args):
+    try:
+        r=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=4)
+        return r.stdout.strip() if r.returncode==0 else ""
+    except (OSError,subprocess.TimeoutExpired):return ""
+class Center(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · Notifications")
+        self.set_default_size(660,620)
+        self.set_border_width(14)
+        self.connect("destroy",Gtk.main_quit)
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8);self.add(root)
+        title=Gtk.Label(label="Notifications & Quiet Hours")
+        title.set_xalign(0);root.pack_start(title,False,False,0)
+        self.search=Gtk.SearchEntry()
+        self.search.set_placeholder_text("Search notification history")
+        self.search.connect("search-changed",lambda *_:self.render())
+        root.pack_start(self.search,False,False,0)
+        bar=Gtk.Box(spacing=8);root.pack_start(bar,False,False,0)
+        for name,fn in (("Refresh",self.refresh),("Restore latest",self.restore),
+                        ("Dismiss visible",self.dismiss),("Toggle Do Not Disturb",self.toggle)):
+            b=Gtk.Button(label=name);b.connect("clicked",fn);bar.pack_start(b,False,False,0)
+        scroll=Gtk.ScrolledWindow();root.pack_start(scroll,True,True,0)
+        self.listbox=Gtk.ListBox();scroll.add(self.listbox)
+        footer=Gtk.Box(spacing=7);root.pack_start(footer,False,False,0)
+        footer.pack_start(Gtk.Label(label="Quiet hours:"),False,False,0)
+        self.begin=Gtk.Entry();self.begin.set_width_chars(6);self.begin.set_text("22:00")
+        self.end=Gtk.Entry();self.end.set_width_chars(6);self.end.set_text("07:00")
+        if SCHEDULE.is_file():
+            parts=SCHEDULE.read_text().strip().split()
+            if len(parts)==2:self.begin.set_text(parts[0]);self.end.set_text(parts[1])
+        footer.pack_start(self.begin,False,False,0);footer.pack_start(Gtk.Label(label="to"),False,False,0)
+        footer.pack_start(self.end,False,False,0)
+        for name,fn in (("Enable",self.enable),("Disable",self.disable)):
+            b=Gtk.Button(label=name);b.connect("clicked",fn);footer.pack_start(b,False,False,0)
+        self.status=Gtk.Label(label="Quiet hours are off until enabled.")
+        self.status.set_xalign(0);root.pack_start(self.status,False,False,0)
+        self.load();self.show_all()
+    def load(self):
+        items=[]
+        for arg in ("history","list"):
+            try:
+                data=json.loads(call("makoctl",arg,"-j") or "[]")
+                if isinstance(data,list):items.extend(data)
+            except ValueError:pass
+        self.items=list({(x.get("id"),x.get("summary"),x.get("body")):x for x in items}.values())
+        self.render()
+    def render(self):
+        for widget in list(self.listbox.get_children()):self.listbox.remove(widget)
+        needle=self.search.get_text().lower()
+        for item in self.items:
+            app=str(item.get("app_name") or "App")
+            summary=str(item.get("summary") or "")
+            body=str(item.get("body") or "")
+            if needle and needle not in (app+" "+summary+" "+body).lower():continue
+            label=Gtk.Label(label=(app+" — "+summary+"\n"+body)[:400])
+            label.set_xalign(0);label.set_line_wrap(True);label.set_selectable(True)
+            label.set_margin_top(7);label.set_margin_bottom(7)
+            self.listbox.add(label)
+        self.listbox.show_all()
+    def refresh(self,*_):self.load()
+    def restore(self,*_):call("makoctl","restore");self.load()
+    def dismiss(self,*_):call("makoctl","dismiss","-a");self.load()
+    def toggle(self,*_):
+        call("makoctl","mode","-t","do-not-disturb")
+        self.status.set_text("Do Not Disturb toggled.")
+    def enable(self,*_):
+        start,end=self.begin.get_text().strip(),self.end.get_text().strip()
+        def valid(s):
+            if not re.fullmatch(r"\d\d:\d\d",s):return False
+            h,m=map(int,s.split(":"));return h<24 and m<60
+        if not valid(start) or not valid(end):
+            self.status.set_text("Use HH:MM times (24-hour clock).");return
+        SCHEDULE.parent.mkdir(parents=True,exist_ok=True)
+        SCHEDULE.write_text(f"{start} {end}\n")
+        call(str(HOME/".local/bin/chromebook-dnd-schedule"))
+        self.status.set_text(f"Quiet hours enabled: {start}–{end}")
+    def disable(self,*_):
+        SCHEDULE.parent.mkdir(parents=True,exist_ok=True);SCHEDULE.write_text("off\n")
+        call(str(HOME/".local/bin/chromebook-dnd-schedule"))
+        self.status.set_text("Scheduled quiet hours disabled.")
+Center();Gtk.main()

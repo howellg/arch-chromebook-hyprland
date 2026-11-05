@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Safe named app layouts; no terminal commands, tabs, URLs, or file paths saved."""
+from pathlib import Path
+import json
+import subprocess
+import sys
+import shutil
+import time
+HOME=Path.home()
+ROOT=HOME/".config/chromebook/layouts"
+ROOT.mkdir(parents=True,exist_ok=True)
+AUTO=HOME/".config/chromebook/restore-on-login"
+ALLOW={
+    "firefox":("firefox",1),
+    "code":("code",2),
+    "code-oss":("code",2),
+    "discord":("discord",3),
+    "dolphin":("dolphin",4),
+    "org.kde.dolphin":("dolphin",4),
+    "kitty":("kitty",5),
+}
+DEFAULTS={
+    "study":["firefox","dolphin"],
+    "programming":["firefox","code","dolphin"],
+    "personal":["firefox","discord"],
+}
+def call(*args):
+    try:
+        p=subprocess.run(args,capture_output=True,text=True,timeout=5)
+        if p.returncode==0:return p.stdout
+    except (OSError,subprocess.TimeoutExpired):pass
+    return ""
+def clients():
+    try:return json.loads(call("hyprctl","clients","-j") or "[]")
+    except ValueError:return []
+def normalize(name):
+    return ALLOW[name][0] if name in ALLOW else None
+def file(name):
+    if not name.replace("-","").replace("_","").isalnum():
+        raise SystemExit("Only letters, numbers, hyphens and underscores in layout names.")
+    return ROOT/(name+".json")
+def save(name):
+    seen=[]
+    for window in clients():
+        app=normalize(window.get("class",""))
+        if app and app!="kitty" and app not in seen:
+            seen.append(app)
+    file(name).write_text(json.dumps({"apps":seen,"version":1},indent=2)+"\n")
+    print(f"Saved {name}: {', '.join(seen) or 'none'}")
+def read(name):
+    if file(name).is_file():
+        obj=json.loads(file(name).read_text())
+        return obj.get("apps",[]) if obj.get("version")==1 else []
+    return DEFAULTS.get(name,[])
+def restore(name):
+    requested=read(name)
+    seen={normalize(c.get("class","")) for c in clients()}
+    # Launch only known commands and skip already-open applications.
+    for app in requested:
+        if app not in DEFAULTS["study"]+DEFAULTS["programming"]+DEFAULTS["personal"]:
+            continue
+        if app in seen or shutil.which(app) is None:continue
+        subprocess.Popen([app],start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        print("Started:",app)
+def main(argv):
+    if not argv or argv[0]=="list":
+        names=sorted(set(DEFAULTS)|{p.stem for p in ROOT.glob("*.json")})
+        print("\n".join(f"{n}: {', '.join(read(n))}" for n in names))
+    elif argv[0]=="save" and len(argv)==2:save(argv[1])
+    elif argv[0]=="restore" and len(argv)==2:restore(argv[1])
+    elif argv[0]=="auto":
+        if len(argv)==2 and argv[1] in ("off","study","programming","personal"):
+            AUTO.write_text(argv[1]+"\n")
+        elif len(argv)==2 and file(argv[1]).is_file():
+            AUTO.write_text(argv[1]+"\n")
+        elif len(argv)==2 and argv[1]=="apply":
+            if AUTO.is_file():
+                value=AUTO.read_text().strip()
+                if value and value!="off":restore(value)
+        else:
+            print(AUTO.read_text().strip() if AUTO.is_file() else "off")
+    else:raise SystemExit("Usage: hypr-session-layout {list|save NAME|restore NAME|auto [NAME|off|apply]}")
+if __name__=="__main__":main(sys.argv[1:])

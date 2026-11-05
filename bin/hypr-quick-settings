@@ -25,7 +25,7 @@ def run(*args):
 class Settings(Gtk.Window):
     def __init__(self):
         super().__init__(title="Chromebook · Quick Settings")
-        self.set_default_size(390, 500)
+        self.set_default_size(470, 710)
         self.set_resizable(False)
         self.set_border_width(16)
         self.get_style_context().add_class("quick-settings")
@@ -62,9 +62,14 @@ class Settings(Gtk.Window):
         main.pack_start(actions, False, False, 0)
         choices = [
             ("Networks", "nm-connection-editor"),
-            ("Sound", "pavucontrol"),
+            ("Devices", str(HOME / ".local/bin/hypr-devices")),
+            ("Notifications", str(HOME / ".local/bin/hypr-notifications")),
             ("Wallpaper", str(HOME / ".local/bin/hypr-wallpaper-picker")),
-            ("Windows", str(HOME / ".local/bin/hypr-window-overview")),
+            ("Windows", str(HOME / ".local/bin/hypr-overview-grid")),
+            ("App Layouts", str(HOME / ".local/bin/hypr-layouts")),
+            ("Displays", str(HOME / ".local/bin/hypr-displays")),
+            ("Maintenance", str(HOME / ".local/bin/hypr-maintenance")),
+            ("First-Run", str(HOME / ".local/bin/hypr-first-run")),
             ("Power", str(HOME / ".local/bin/hypr-power-menu")),
             ("Close", None),
         ]
@@ -73,6 +78,17 @@ class Settings(Gtk.Window):
             button.get_style_context().add_class("action")
             button.connect("clicked", self.launch, command)
             actions.attach(button, i % 3, i // 3, 1, 1)
+        self.mode_label = Gtk.Label(label="Desktop Modes")
+        self.mode_label.set_xalign(0)
+        self.mode_label.get_style_context().add_class("section")
+        main.pack_start(self.mode_label, False, False, 0)
+        modes = Gtk.Box(spacing=8)
+        main.pack_start(modes, False, False, 0)
+        for name in ("normal", "class", "presentation"):
+            btn = Gtk.Button(label=name.title())
+            btn.get_style_context().add_class("action")
+            btn.connect("clicked", self.set_mode, name)
+            modes.pack_start(btn, True, True, 0)
         self.refresh()
         self.show_all()
         GLib.timeout_add_seconds(10, self.refresh)
@@ -106,6 +122,8 @@ class Settings(Gtk.Window):
 
     def refresh(self):
         self.mute_changes = True
+        active_mode = cmd(str(HOME / ".local/bin/hypr-desktop-mode"), "status") or "normal"
+        self.mode_label.set_text(f"Desktop Modes · {active_mode.title()}")
         wifi = cmd("nmcli", "radio", "wifi").lower()
         self.wifi.set_label(f"󰤨  Wi-Fi\n{'Enabled' if wifi == 'enabled' else 'Disabled'}")
         bluetooth = cmd("bluetoothctl", "show")
@@ -157,6 +175,10 @@ class Settings(Gtk.Window):
         mode = choices[(choices.index(mode) + 1) % len(choices)] if mode in choices else "auto"
         run(str(HOME / ".local/bin/hypr-power-profile"), mode)
         GLib.timeout_add(900, self.refresh)
+
+    def set_mode(self, _button, mode):
+        run(str(HOME / ".local/bin/hypr-desktop-mode"), mode)
+        self.close()
 
     def close(self):
         self.destroy()

@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Bluetooth + PipeWire device chooser and KDE Connect companion window."""
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk, GLib
+from pathlib import Path
+import subprocess
+import re
+
+def call(*args):
+    try:
+        p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=6)
+        return p.stdout.strip() if p.returncode==0 else ""
+    except (OSError,subprocess.TimeoutExpired):return ""
+def spawn(*args):
+    try:subprocess.Popen(args,start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    except OSError:pass
+def heading(box,text):
+    lab=Gtk.Label(label=text);lab.set_xalign(0)
+    lab.get_style_context().add_class("heading")
+    box.pack_start(lab,False,False,3)
+def button(box,label,callback):
+    b=Gtk.Button(label=label);b.connect("clicked",callback)
+    box.pack_start(b,False,False,2)
+    return b
+class Devices(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · Devices")
+        self.set_default_size(620,540)
+        self.set_border_width(14)
+        self.connect("destroy",Gtk.main_quit)
+        self.status=Gtk.Label(label="")
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=6)
+        self.add(root)
+        self.pages=Gtk.Notebook();root.pack_start(self.pages,True,True,0)
+        self.pages.append_page(self.bluetooth_tab(),Gtk.Label(label="Bluetooth"))
+        self.pages.append_page(self.audio_tab(),Gtk.Label(label="Audio"))
+        self.pages.append_page(self.connect_tab(),Gtk.Label(label="KDE Connect"))
+        root.pack_start(self.status,False,False,0)
+        self.show_all()
+    def message(self,text):self.status.set_text(text)
+    def bluetooth_tab(self):
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8)
+        heading(root,"Bluetooth devices")
+        state=call("bluetoothctl","show")
+        label=Gtk.Label(label="Controller: "+("On" if "Powered: yes" in state else "Off"))
+        label.set_xalign(0);root.pack_start(label,False,False,0)
+        button(root,"Open Bluetooth settings",lambda *_:spawn("bluetoothctl","scan","on"))
+        for line in call("bluetoothctl","devices").splitlines():
+            m=re.match(r"Device ([0-9A-Fa-f:]{17}) (.+)",line)
+            if not m:continue
+            mac,name=m.groups()
+            row=Gtk.Box(spacing=8);root.pack_start(row,False,False,0)
+            label=Gtk.Label(label=name[:42]);label.set_xalign(0)
+            row.pack_start(label,True,True,0)
+            info=call("bluetoothctl","info",mac)
+            connected="Connected: yes" in info
+            b=Gtk.Button(label="Disconnect" if connected else "Connect")
+            b.connect("clicked",self.bt_action,mac,connected)
+            row.pack_start(b,False,False,0)
+        return root
+    def bt_action(self,_b,mac,connected):
+        spawn("bluetoothctl","disconnect" if connected else "connect",mac)
+        self.message("Connection request sent. Reopen Devices to refresh status.")
+    def audio_tab(self):
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8)
+        heading(root,"Audio output")
+        for line in call("pactl","list","short","sinks").splitlines():
+            fields=line.split("\t")
+            if len(fields)<2:continue
+            name=fields[1]
+            label=name.split(".")[-1].replace("_"," ")[:52]
+            button(root,label,lambda _b,s=name:self.set_default("sink",s))
+        heading(root,"Microphone input")
+        for line in call("pactl","list","short","sources").splitlines():
+            fields=line.split("\t")
+            if len(fields)<2 or fields[1].endswith(".monitor"):continue
+            name=fields[1]
+            button(root,name.split(".")[-1].replace("_"," ")[:52],
+                   lambda _b,s=name:self.set_default("source",s))
+        button(root,"Open per-application volume mixer (pavucontrol)",
+               lambda *_:spawn("pavucontrol"))
+        return root
+    def set_default(self,kind,name):
+        p=subprocess.run(["pactl","set-default-"+kind,name],capture_output=True,text=True,timeout=6)
+        self.message(("Default "+kind+" changed" if p.returncode==0 else p.stderr[:100]))
+    def connect_tab(self):
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8)
+        heading(root,"KDE Connect")
+        description=Gtk.Label(label="Pair your Android phone with the KDE Connect app on the same network.")
+        description.set_line_wrap(True);description.set_xalign(0)
+        root.pack_start(description,False,False,0)
+        output=call("kdeconnect-cli","--list-devices")
+        for line in output.splitlines():
+            lab=Gtk.Label(label=line[:85]);lab.set_xalign(0)
+            root.pack_start(lab,False,False,0)
+        button(root,"Refresh discovery",lambda *_:self.kde_action("--refresh"))
+        button(root,"Open KDE Connect device manager",
+               lambda *_:spawn("kdeconnect-app"))
+        button(root,"Show KDE Connect tray icon",
+               lambda *_:spawn("kdeconnect-indicator"))
+        return root
+    def kde_action(self,action):
+        spawn("kdeconnect-cli",action)
+        self.message("Discovery refreshed. Reopen Devices for new device list.")
+Devices()
+Gtk.main()

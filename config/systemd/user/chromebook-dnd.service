@@ -1,0 +1,5 @@
+[Unit]
+Description=Apply Chromebook scheduled Do Not Disturb
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/chromebook-dnd-schedule

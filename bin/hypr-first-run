@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Graphical first-run assistant: hardware/dependency detection and safe install."""
+from pathlib import Path
+import subprocess
+import shutil
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk, Gdk
+HOME=Path.home()
+REPO=Path(__file__).resolve().parent.parent
+PREF=HOME/".config/chromebook/repository-path"
+if PREF.is_file() and Path(PREF.read_text().strip()).is_dir():
+    REPO=Path(PREF.read_text().strip())
+elif not (REPO/"install.sh").exists():
+    REPO=HOME/"Projects/arch-chromebook-hyprland"
+PACKAGES=("hyprland","kitty","waybar","wofi","mako","hyprlock","hypridle",
+          "hyprpaper","wl-clipboard","cliphist","grim","slurp",
+          "brightnessctl","playerctl","network-manager-applet",
+          "pavucontrol","kdeconnect","python-gobject","python-cairo",
+          "power-profiles-daemon","wf-recorder")
+def run(*args):
+    try:return subprocess.run(args,capture_output=True,text=True,timeout=8)
+    except (OSError,subprocess.TimeoutExpired):return None
+def installed(pkg):
+    p=run("pacman","-Q",pkg)
+    return p is not None and p.returncode==0
+class Wizard(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook Hyprland Setup")
+        self.set_default_size(760,590)
+        self.set_border_width(16)
+        self.connect("destroy",Gtk.main_quit)
+        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10);self.add(root)
+        head=Gtk.Label(label="Chromebook Hyprland · First-run Setup")
+        head.set_xalign(0);root.pack_start(head,False,False,0)
+        self.pages=Gtk.Notebook();root.pack_start(self.pages,True,True,0)
+        self.pages.append_page(self.hardware(),Gtk.Label(label="Hardware"))
+        self.pages.append_page(self.dependencies(),Gtk.Label(label="Dependencies"))
+        self.pages.append_page(self.install(),Gtk.Label(label="Install"))
+        self.pages.append_page(self.options(),Gtk.Label(label="Options"))
+        self.status=Gtk.Label(label="Nothing changes until you choose a button.")
+        self.status.set_xalign(0);root.pack_start(self.status,False,False,0)
+        self.show_all()
+    def box(self):
+        w=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=12)
+        w.set_border_width(10)
+        return w
+    def label(self,root,text):
+        l=Gtk.Label(label=text);l.set_line_wrap(True);l.set_xalign(0)
+        root.pack_start(l,False,False,0)
+    def action(self,root,text,fn):
+        b=Gtk.Button(label=text);b.connect("clicked",fn);root.pack_start(b,False,False,0)
+    def hardware(self):
+        root=self.box()
+        self.label(root,"This configuration was developed for the Acer Chromebook Kano, but can be adapted to other models.")
+        output=run(str(HOME/".local/bin/chromebook-hardware-check"))
+        result=output.stdout if output and output.returncode==0 else "Run the hardware checker after installing."
+        sc=Gtk.ScrolledWindow();root.pack_start(sc,True,True,0)
+        t=Gtk.TextView();t.set_editable(False);t.set_monospace(True);t.get_buffer().set_text(result)
+        sc.add(t)
+        return root
+    def dependencies(self):
+        root=self.box()
+        self.label(root,"Package status (no packages are installed automatically):")
+        missing=[p for p in PACKAGES if not installed(p)]
+        self.missing=missing
+        self.label(root,"Installed: "+str(len(PACKAGES)-len(missing))+" / "+str(len(PACKAGES)))
+        self.label(root,"Missing: "+(", ".join(missing) if missing else "None"))
+        self.action(root,"Copy missing-package installation command",self.copy_pkgs)
+        self.label(root,"Run the copied command yourself in a terminal. The terminal will request your sudo password.")
+        return root
+    def copy_pkgs(self,*_):
+        command="sudo pacman -S --needed "+" ".join(self.missing) if self.missing else "# All checked packages installed"
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(command,-1)
+        self.status.set_text("Package command copied to clipboard.")
+    def install(self):
+        root=self.box()
+        self.label(root,"Installer path: "+str(REPO/"install.sh"))
+        self.label(root,"Default installation skips existing files. --force makes a backup before replacing existing configs. Neither option installs Arch packages.")
+        self.action(root,"Run installer dry run",lambda *_:self.execute(["--dry-run"]))
+        self.action(root,"Install missing config files safely",lambda *_:self.execute([]))
+        self.action(root,"Replace existing config files (backed up)",self.force_confirm)
+        return root
+    def execute(self,flags):
+        target=REPO/"install.sh"
+        if not target.exists():
+            self.status.set_text("Installer not found. Clone the GitHub repository first.")
+            return
+        r=run(str(target),*flags)
+        if r:
+            self.status.set_text(("Success: " if r.returncode==0 else "Installer issue: ")+
+                (r.stdout+r.stderr)[-180:].replace("\n"," "))
+        else:self.status.set_text("Unable to run installer.")
+    def force_confirm(self,*_):
+        box=Gtk.MessageDialog(transient_for=self,flags=0,message_type=Gtk.MessageType.WARNING,
+                              buttons=Gtk.ButtonsType.YES_NO,
+                              text="Replace your existing desktop configuration?")
+        box.format_secondary_text("The installer will back up matching files before overwriting. KDE Plasma will not be removed.")
+        answer=box.run();box.destroy()
+        if answer==Gtk.ResponseType.YES:self.execute(["--force"])
+    def options(self):
+        root=self.box()
+        self.label(root,"Optional features. These can be enabled later in the desktop tools:")
+        self.action(root,"Enable automatic matching display profiles",self.auto_displays)
+        self.action(root,"Disable automatic matching display profiles",self.no_auto_displays)
+        self.action(root,"Configure quiet hours / notification history",
+                    lambda *_:subprocess.Popen([str(HOME/".local/bin/hypr-notifications")]))
+        self.action(root,"Open named app layout manager",
+                    lambda *_:subprocess.Popen([str(HOME/".local/bin/hypr-layouts")]))
+        self.label(root,"Review docs/FEATURES.md and docs/TESTING.md before sharing the project with other Chromebook users.")
+        return root
+    def auto_displays(self,*_):
+        subprocess.run([str(HOME/".local/bin/hypr-display-profile"),"auto","on"])
+        self.status.set_text("Auto display layout enabled; save a matching profile first.")
+    def no_auto_displays(self,*_):
+        subprocess.run([str(HOME/".local/bin/hypr-display-profile"),"auto","off"])
+        self.status.set_text("Auto display layout disabled.")
+Wizard();Gtk.main()

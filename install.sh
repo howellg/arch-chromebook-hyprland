@@ -54,10 +54,12 @@ if [[ "$dryrun" == 1 ]]; then
 fi
 echo "Installed $copies files, skipped $skips."
 [[ -d "$backup" ]] && echo "Backup directory: $backup"
+mkdir -p "$HOME/.config/chromebook"
+printf "%s\n" "$repo" > "$HOME/.config/chromebook/repository-path"
 
 if command -v systemctl >/dev/null; then
   systemctl --user daemon-reload
-  for timer in chromebook-battery-watch.timer chromebook-power-profile.timer; do
+  for timer in chromebook-battery-watch.timer chromebook-power-profile.timer chromebook-dnd.timer; do
     if [[ -f "$HOME/.config/systemd/user/$timer" ]]; then
       systemctl --user enable --now "$timer"
     fi

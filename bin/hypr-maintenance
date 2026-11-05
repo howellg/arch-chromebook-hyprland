@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Read-only system maintenance view; updates only in user-approved terminal."""
+from pathlib import Path
+import json, subprocess, sys, shutil
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk
+
+def run(*args,timeout=6):
+    try:
+        p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+        return p.stdout.strip() if p.returncode==0 else (p.stdout+p.stderr).strip()
+    except (OSError,subprocess.TimeoutExpired) as e:return str(e)
+def report():
+    parts=[
+        ("Storage", run("df","-h",str(Path.home()))),
+        ("Battery", run("upower","-i","/org/freedesktop/UPower/devices/battery_BAT0")),
+        ("Available package upgrades (current local sync DB; may be stale)",
+         run("pacman","-Qu") or "None listed by local package database."),
+        ("Failed user services",run("systemctl","--user","--failed","--no-pager","--plain")),
+        ("Recent system errors (current boot)",run("journalctl","-b","-p","err","--no-pager","-n","12")),
+    ]
+    return "\n\n".join("=== "+name+" ===\n"+value for name,value in parts)
+if "--report" in sys.argv:
+    print(report());sys.exit(0)
+class Maintenance(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · System Maintenance")
+        self.set_default_size(850,670)
+        self.set_border_width(14);self.connect("destroy",Gtk.main_quit)
+        box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=9);self.add(box)
+        bar=Gtk.Box(spacing=8);box.pack_start(bar,False,False,0)
+        label=Gtk.Label(label="System Maintenance")
+        bar.pack_start(label,True,True,0)
+        for label,cb in (("Refresh report",self.refresh),("Open update terminal",self.update_terminal)):
+            b=Gtk.Button(label=label);b.connect("clicked",cb);bar.pack_start(b,False,False,0)
+        subtitle=Gtk.Label(label="Status is read-only. Updates run only after you choose and approve them.")
+        subtitle.set_xalign(0);box.pack_start(subtitle,False,False,0)
+        sc=Gtk.ScrolledWindow();box.pack_start(sc,True,True,0)
+        view=Gtk.TextView();view.set_monospace(True);view.set_editable(False);view.set_cursor_visible(False)
+        view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR);sc.add(view)
+        self.view=view;self.refresh();self.show_all()
+    def refresh(self,*_):
+        self.view.get_buffer().set_text(report())
+    def update_terminal(self,*_):
+        # Explicit UI action; users still need to enter their sudo password.
+        if not shutil.which("kitty"):return
+        subprocess.Popen(["kitty","--title","Manual Arch Linux updates","--hold",
+                          "bash","-lc","sudo pacman -Syu"],
+                         stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+Maintenance();Gtk.main()

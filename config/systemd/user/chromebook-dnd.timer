@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Chromebook quiet hours every five minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=chromebook-dnd.service
+[Install]
+WantedBy=timers.target

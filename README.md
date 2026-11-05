@@ -31,7 +31,8 @@ Install on a working Arch Linux desktop (not a live USB). Official repository pa
       waybar wofi mako hyprlock hypridle hyprpaper \
       hyprpolkitagent hyprlauncher wl-clipboard cliphist \
       grim slurp brightnessctl playerctl network-manager-applet \
-      pavucontrol python-gobject python-cairo gtk3 power-profiles-daemon \
+      pavucontrol kdeconnect upower python-gobject python-cairo gtk3 \
+      power-profiles-daemon \
       xdg-desktop-portal xdg-desktop-portal-hyprland \
       xdg-desktop-portal-gtk hyprsunset
 
@@ -145,3 +146,16 @@ Disable the two wl-paste autostart lines in hyprland.lua to stop new history cap
 - docs/TESTING.md: manual verification and safety checklist
 
 The working machine initially uses default Kitty settings; selecting a wallpaper can apply an accent-only Kitty override.
+
+## Further desktop integrations
+
+Hyprland now includes Class and Presentation Modes, KDE Connect support, a searchable Mako notification center with optional quiet hours, named app-session layouts, Bluetooth and PipeWire device pickers, monitor profiles, a read-only maintenance dashboard, and a graphical first-run installer wizard.
+
+- Super+Shift+C: Class Mode / DND + Power Saver
+- Super+Shift+M: Presentation Mode / idle inhibition + DND
+- Super+Shift+B: return to Normal Mode
+- Super+Shift+H: searchable notification center
+- Super+Shift+K: Bluetooth / audio / KDE Connect devices
+- Super+Shift+Q: full Quick Settings with App Layouts, Displays, Maintenance and First-Run buttons
+
+See [Desktop Integrations](docs/INTEGRATIONS.md) for setup, privacy, limitations, and testing. Scheduled DND, automatic app restoration, and monitor auto-restoration are disabled until explicitly enabled. Manual package upgrades still require confirmation and sudo. KDE Connect phone pairing and projector compatibility must be tested on the actual hardware.
