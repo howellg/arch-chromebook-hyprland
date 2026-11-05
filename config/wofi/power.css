@@ -1,0 +1,42 @@
+/* Hyprland power menu · Catppuccin Mocha */
+* {
+    font-family: "JetBrainsMono Nerd Font", sans-serif;
+    font-size: 15px;
+    color: #cdd6f4;
+}
+window {
+    background: #1e1e2e;
+    border: 2px solid #89b4fa;
+    border-radius: 16px;
+}
+#outer-box {
+    margin: 14px;
+    background: transparent;
+}
+#input {
+    margin-bottom: 11px;
+    padding: 10px 12px;
+    border: 1px solid #45475a;
+    border-radius: 9px;
+    background: #313244;
+    color: #cdd6f4;
+    box-shadow: none;
+}
+#scroll, #inner-box {
+    background: transparent;
+}
+#entry {
+    padding: 9px 11px;
+    margin: 2px 0;
+    border-radius: 9px;
+    background: transparent;
+}
+#entry:selected {
+    background: #45475a;
+}
+#entry:selected #text {
+    color: #89b4fa;
+}
+#text {
+    margin-left: 7px;
+}

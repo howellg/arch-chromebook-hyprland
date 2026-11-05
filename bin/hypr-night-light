@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Start only if Hyprsunset is installed; no error on the initial base setup.
+if command -v hyprsunset >/dev/null 2>&1; then
+  exec hyprsunset
+fi

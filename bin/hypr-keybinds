@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Searchable, read-only cheatsheet generated from active Hyprland shortcuts."""
+import json
+import subprocess
+import sys
+from collections import OrderedDict
+from pathlib import Path
+
+# Named descriptions are only for display. The authoritative key list is
+# queried from the compositor each time this is opened.
+labels = {
+    (64, "R"): ("APPLICATIONS & SESSION", "Open application launcher"),
+    (64, "SPACE"): ("APPLICATIONS & SESSION", "Open application launcher"),
+    (64, "B"): ("APPLICATIONS & SESSION", "Open Firefox browser"),
+    (64, "D"): ("APPLICATIONS & SESSION", "Open Discord"),
+    (64, "I"): ("APPLICATIONS & SESSION", "Open Visual Studio Code (IDE)"),
+    (64, "Q"): ("APPLICATIONS & SESSION", "Open Kitty terminal"),
+    (64, "E"): ("APPLICATIONS & SESSION", "Open Dolphin file manager"),
+    (64, "L"): ("APPLICATIONS & SESSION", "Lock screen"),
+    (64, "M"): ("APPLICATIONS & SESSION", "Exit Hyprland (logs out)"),
+    (65, "E"): ("APPLICATIONS & SESSION", "Power menu (confirms destructive actions)"),
+    (64, "comma"): ("APPLICATIONS & SESSION", "Open this keybinding cheatsheet"),
+    (64, "C"): ("WINDOW MANAGEMENT", "Close active window"),
+    (64, "V"): ("WINDOW MANAGEMENT", "Toggle floating window"),
+    (64, "P"): ("WINDOW MANAGEMENT", "Toggle pseudotiling"),
+    (64, "J"): ("WINDOW MANAGEMENT", "Toggle dwindle split"),
+    (64, "left"): ("WINDOW MANAGEMENT", "Focus window to the left"),
+    (64, "right"): ("WINDOW MANAGEMENT", "Focus window to the right"),
+    (64, "up"): ("WINDOW MANAGEMENT", "Focus window above"),
+    (64, "down"): ("WINDOW MANAGEMENT", "Focus window below"),
+    (64, "Tab"): ("WINDOW MANAGEMENT", "Open searchable window overview"),
+    (64, "S"): ("WORKSPACES", "Toggle special scratchpad workspace"),
+    (65, "S"): ("WORKSPACES", "Move window to special scratchpad"),
+    (64, "mouse_up"): ("WORKSPACES", "Scroll to previous workspace"),
+    (64, "mouse_down"): ("WORKSPACES", "Scroll to next workspace"),
+    (64, "mouse:272"): ("WINDOW MANAGEMENT", "Drag focused window with left mouse button"),
+    (64, "mouse:273"): ("WINDOW MANAGEMENT", "Resize window with right mouse button"),
+    (65, "A"): ("SCREENSHOTS", "Select region and copy as PNG (Ctrl+V to paste)"),
+    (65, "D"): ("SCREENSHOTS", "Select region and save PNG"),
+    (65, "F"): ("SCREENSHOTS", "Copy full screen as PNG"),
+    (65, "G"): ("SCREENSHOTS", "Save full screen as PNG"),
+    (64, "N"): ("NOTIFICATIONS", "Restore previous notification"),
+    (65, "N"): ("NOTIFICATIONS", "Toggle Do Not Disturb"),
+    (65, "V"): ("CLIPBOARD", "Search clipboard history (text and images)"),
+    (0, "XF86Back"): ("CHROMEBOOK TOP ROW", "Back — previous page / navigation"),
+    (0, "XF86Reload"): ("CHROMEBOOK TOP ROW", "Refresh — reload current page"),
+    (0, "XF86FullScreen"): ("CHROMEBOOK TOP ROW", "Toggle focused window fullscreen"),
+    (0, "XF86LaunchA"): ("CHROMEBOOK TOP ROW", "Overview — switch windows"),
+    (0, "Print"): ("CHROMEBOOK TOP ROW", "Screenshot key — select region and copy"),
+    (1, "Print"): ("CHROMEBOOK TOP ROW", "Shift + Screenshot — save selected region"),
+    (4, "Print"): ("CHROMEBOOK TOP ROW", "Ctrl + Screenshot — copy full screen"),
+    (0, "XF86AudioRaiseVolume"): ("CHROMEBOOK TOP ROW", "Increase speaker volume"),
+    (0, "XF86AudioLowerVolume"): ("CHROMEBOOK TOP ROW", "Decrease speaker volume"),
+    (0, "XF86AudioMute"): ("CHROMEBOOK TOP ROW", "Toggle speaker mute"),
+    (0, "XF86AudioMicMute"): ("CHROMEBOOK TOP ROW", "Toggle microphone mute"),
+    (0, "XF86MonBrightnessUp"): ("CHROMEBOOK TOP ROW", "Increase screen brightness"),
+    (0, "XF86MonBrightnessDown"): ("CHROMEBOOK TOP ROW", "Decrease screen brightness"),
+    (0, "XF86AudioNext"): ("CHROMEBOOK TOP ROW", "Next media track"),
+    (0, "XF86AudioPause"): ("CHROMEBOOK TOP ROW", "Play / pause media"),
+    (0, "XF86AudioPlay"): ("CHROMEBOOK TOP ROW", "Play / pause media"),
+    (0, "XF86AudioPrev"): ("CHROMEBOOK TOP ROW", "Previous media track"),
+}
+
+order = [
+    "APPLICATIONS & SESSION", "SCREENSHOTS", "CLIPBOARD", "WINDOW MANAGEMENT",
+    "WORKSPACES", "NOTIFICATIONS", "CHROMEBOOK TOP ROW", "OTHER BINDINGS",
+]
+
+def readable_key(mask, key):
+    mods = []
+    if mask & 64:
+        mods.append("Super")
+    if mask & 1:
+        mods.append("Shift")
+    if mask & 4:
+        mods.append("Ctrl")
+    if mask & 8:
+        mods.append("Alt")
+    key = {
+        "comma": ",", "SPACE": "Space",
+        "mouse_up": "Scroll Up", "mouse_down": "Scroll Down",
+        "mouse:272": "Left Drag", "mouse:273": "Right Drag",
+        "XF86Back": "Top-row Back", "XF86Reload": "Top-row Refresh",
+        "XF86FullScreen": "Top-row Fullscreen", "XF86LaunchA": "Top-row Overview",
+        "Print": "Top-row Screenshot",
+        "XF86AudioRaiseVolume": "Volume Up",
+        "XF86AudioLowerVolume": "Volume Down",
+        "XF86AudioMute": "Volume Mute",
+        "XF86AudioMicMute": "Mic Mute",
+        "XF86MonBrightnessUp": "Brightness Up",
+        "XF86MonBrightnessDown": "Brightness Down",
+        "XF86AudioNext": "Next Track",
+        "XF86AudioPause": "Media Pause",
+        "XF86AudioPlay": "Media Play",
+        "XF86AudioPrev": "Previous Track",
+    }.get(key, key)
+    return " + ".join(mods + [str(key)])
+
+try:
+    raw = subprocess.check_output(["hyprctl", "binds", "-j"], text=True)
+    bindings = json.loads(raw)
+except (OSError, ValueError, subprocess.CalledProcessError) as e:
+    print(f"Unable to load Hyprland keybindings: {e}", file=sys.stderr)
+    sys.exit(1)
+
+groups = OrderedDict((group, []) for group in order)
+for item in bindings:
+    mask, key = int(item.get("modmask", 0)), str(item.get("key", ""))
+    known = labels.get((mask, key))
+    if known:
+        group, description = known
+    elif key.isdigit() and mask in (64, 65):
+        number = 10 if key == "0" else int(key)
+        group = "WORKSPACES"
+        description = ("Move active window to" if mask == 65 else "Switch to") + f" workspace {number}"
+    else:
+        group = "OTHER BINDINGS"
+        description = item.get("dispatcher", "Action").replace("HL.Dispatcher(", "").rstrip(")")
+    groups[group].append((readable_key(mask, key), description))
+
+lines = [
+    f"  HYPRLAND SHORTCUTS  ·  {len(bindings)} active bindings",
+    "  Search to filter shortcuts  •  Esc to close",
+]
+for category, rows in groups.items():
+    if not rows:
+        continue
+    lines.append(f"  ──────────  {category}  ──────────")
+    for combo, description in rows:
+        lines.append(f"  {combo:<26} {description}")
+
+cmd = [
+    "wofi", "--dmenu", "--no-custom-entry", "--insensitive",
+    "--width", "850", "--height", "690", "--lines", "22",
+    "--prompt", "Search shortcuts…",
+    "--style", str(Path.home() / ".config/wofi/cheatsheet.css"),
+]
+subprocess.run(cmd, input="\n".join(lines) + "\n", text=True, stdout=subprocess.DEVNULL, check=False)

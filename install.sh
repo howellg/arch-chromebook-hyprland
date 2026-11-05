@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Safe, non-destructive dotfiles installer for an Arch Chromebook.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")" && pwd)
+force=0
+dryrun=0
+for arg in "$@"; do
+  case "$arg" in
+    --force) force=1 ;;
+    --dry-run) dryrun=1 ;;
+    *) echo "Unknown option: $arg (use --force or --dry-run)" >&2; exit 2 ;;
+  esac
+done
+
+backup="$HOME/.local/state/arch-chromebook-hyprland/backup-$(date +%Y%m%d-%H%M%S)"
+copies=0
+skips=0
+
+copy_one() {
+  local src="$1" dst="$2" rel="$3"
+  if [[ -e "$dst" && "$force" != 1 ]]; then
+    printf 'SKIP existing: %s  (add --force for a backed-up replacement)\n' "$dst"
+    ((skips+=1))
+    return
+  fi
+  if [[ "$dryrun" == 1 ]]; then
+    printf 'WOULD install: %s\n' "$dst"
+    return
+  fi
+  if [[ -e "$dst" ]]; then
+    mkdir -p "$backup/$(dirname "$rel")"
+    cp -p "$dst" "$backup/$rel"
+  fi
+  mkdir -p "$(dirname "$dst")"
+  sed "s|@HOME@|$HOME|g" "$src" > "$dst"
+  if [[ "$rel" == bin/* ]]; then chmod 755 "$dst"; fi
+  ((copies+=1))
+}
+
+while IFS= read -r -d '' src; do
+  rel=$(realpath --relative-to="$repo/config" "$src")
+  copy_one "$src" "$HOME/.config/$rel" "config/$rel"
+done < <(find "$repo/config" -type f -print0)
+
+while IFS= read -r -d '' src; do
+  name=$(basename "$src")
+  copy_one "$src" "$HOME/.local/bin/$name" "bin/$name"
+done < <(find "$repo/bin" -maxdepth 1 -type f -print0)
+
+if [[ "$dryrun" == 1 ]]; then
+  echo "Dry run complete — no changes."
+  exit 0
+fi
+echo "Installed $copies files, skipped $skips."
+[[ -d "$backup" ]] && echo "Backup directory: $backup"
+
+if command -v systemctl >/dev/null && [[ -f "$HOME/.config/systemd/user/chromebook-battery-watch.timer" ]]; then
+  systemctl --user daemon-reload
+  systemctl --user enable --now chromebook-battery-watch.timer
+fi
+echo "Restart your Hyprland session for autostart settings to apply."
+echo "Check Hyprland errors using: hyprctl configerrors"

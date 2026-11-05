@@ -1,0 +1,114 @@
+
+{
+    "layer": "top",
+    "position": "top",
+    "height": 40,
+    "spacing": 6,
+    "margin-top": 4,
+    "margin-left": 8,
+    "margin-right": 8,
+
+    "modules-left": [
+        "custom/arch",
+        "hyprland/workspaces",
+	"hyprland/window"
+    ],
+
+    "modules-center": [
+        "clock"
+    ],
+
+    "modules-right": [
+        "cpu",
+        "memory",
+        "network",
+        "pulseaudio",
+        "backlight",
+        "battery",
+        "tray",
+        "custom/power"
+    ],
+
+    "custom/arch": {
+        "format": "󰣇",
+        "tooltip": false,
+        "on-click": "@HOME@/.local/bin/hypr-app-launcher"
+    },
+
+    "hyprland/workspaces": {
+        "format": "{name}",
+        "on-click": "activate",
+        "sort-by-number": true,
+        "persistent-workspaces": {
+            "*": 5
+        }
+    },
+
+    "hyprland/window": {
+        "format": "{title}",
+        "max-length": 20
+    },
+
+    "clock": {
+        "format": "󰥔  {:%a %d %b · %H:%M}",
+        "tooltip-format": "<tt>{calendar}</tt>"
+    },
+
+    "cpu": {
+        "format": "󰍛  {usage}%",
+        "interval": 5
+    },
+
+    "memory": {
+        "format": "󰘚  {}%",
+        "interval": 5
+    },
+
+    "network": {
+        "format-wifi": "󰤨  {signalStrength}%",
+        "format-ethernet": "󰈀",
+        "format-disconnected": "󰤭",
+        "tooltip-format-wifi": "{essid}\n{ipaddr}",
+        "on-click": "nm-connection-editor"
+    },
+
+    "pulseaudio": {
+        "format": "{icon}  {volume}%",
+        "format-muted": "󰝟",
+        "format-icons": {
+            "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "on-click": "pavucontrol"
+    },
+
+    "backlight": {
+        "format": "󰃠  {percent}%"
+    },
+
+    "battery": {
+        "bat": "BAT0",
+        "interval": 10,
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon}  {capacity}%",
+        "format-charging": "󰂄  {capacity}%",
+        "format-icons": [
+            "󰂎", "󰁺", "󰁻", "󰁼", "󰁽",
+            "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"
+        ]
+    },
+
+    "tray": {
+        "icon-size": 15,
+        "spacing": 8
+    },
+
+    "custom/power": {
+        "format": "󰐥",
+        "tooltip": true,
+        "tooltip-format": "Power menu · Super+Shift+E",
+        "on-click": "@HOME@/.local/bin/hypr-power-menu"
+    }
+}

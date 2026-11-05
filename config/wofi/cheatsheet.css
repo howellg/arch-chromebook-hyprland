@@ -1,0 +1,42 @@
+/* Searchable shortcuts overlay — Catppuccin Mocha translucent */
+* {
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-size: 12px;
+    color: #cdd6f4;
+}
+window {
+    background-color: rgba(24, 24, 37, 0.91);
+    border: 1px solid rgba(203, 166, 247, 0.82);
+    border-radius: 18px;
+}
+#outer-box {
+    margin: 16px;
+    background-color: transparent;
+}
+#input {
+    padding: 11px 14px;
+    margin-bottom: 12px;
+    background-color: rgba(49, 50, 68, 0.88);
+    border: 1px solid rgba(203, 166, 247, 0.45);
+    border-radius: 11px;
+    color: #cdd6f4;
+    box-shadow: none;
+}
+#scroll, #inner-box {
+    background-color: transparent;
+}
+#entry {
+    margin: 1px 0;
+    padding: 5px 11px;
+    background-color: transparent;
+    border-radius: 7px;
+}
+#entry:selected {
+    background-color: rgba(203, 166, 247, 0.20);
+}
+#entry:selected #text {
+    color: #f5c2e7;
+}
+#text {
+    color: #cdd6f4;
+}

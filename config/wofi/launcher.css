@@ -1,0 +1,56 @@
+/* Catppuccin Mocha — translucent launcher */
+* {
+    font-family: "JetBrainsMono Nerd Font", sans-serif;
+    font-size: 14px;
+    color: #cdd6f4;
+}
+
+window {
+    background-color: rgba(30, 30, 46, 0.87);
+    border: 1px solid rgba(137, 180, 250, 0.85);
+    border-radius: 18px;
+}
+
+#outer-box {
+    margin: 15px;
+    padding: 5px;
+    background-color: transparent;
+}
+
+#input {
+    margin-bottom: 12px;
+    padding: 11px 14px;
+    color: #cdd6f4;
+    background-color: rgba(49, 50, 68, 0.83);
+    border: 1px solid rgba(137, 180, 250, 0.36);
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+#inner-box, #scroll {
+    background-color: transparent;
+}
+
+#entry {
+    padding: 9px 12px;
+    margin: 3px 0;
+    background-color: transparent;
+    border-radius: 11px;
+}
+
+#entry:selected {
+    background-color: rgba(137, 180, 250, 0.22);
+}
+
+#entry:selected #text {
+    color: #b4d0ff;
+}
+
+#text {
+    color: #cdd6f4;
+    margin-left: 10px;
+}
+
+#img {
+    margin-right: 7px;
+}

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Autostart Desktop Commander remote bridge in a dedicated Kitty window.
+# The Hyprland window rule sends class "chromebook-desktop-commander" to WS9.
+set -euo pipefail
+
+# Avoid launching a duplicate if Desktop Commander is already running,
+# including when it was started manually before this script.
+if pgrep -u "$(id -u)" -f '^npm exec @wonderwhy-er/desktop-commander(@latest)? remote$' >/dev/null ||
+   pgrep -u "$(id -u)" -f '^node .*/desktop-commander remote$' >/dev/null; then
+    exit 0
+fi
+
+exec kitty --class chromebook-desktop-commander \
+    --title "Desktop Commander · remote" \
+    --hold \
+    bash -lc 'exec npx --yes @wonderwhy-er/desktop-commander@latest remote'

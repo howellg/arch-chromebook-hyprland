@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Volume/brightness with a small Mako progress notification; no new daemon needed.
+set -euo pipefail
+mode=${1:-}
+sink=@DEFAULT_AUDIO_SINK@
+source=@DEFAULT_AUDIO_SOURCE@
+notify_progress() {
+  local title=$1 value=$2 id=$3
+  notify-send -a "Chromebook controls" -t 1000 -r "$id" \
+    -h "int:value:$value" -h "string:x-canonical-private-synchronous:$title" \
+    "$title · $value%"
+}
+case "$mode" in
+  volume-up)
+    wpctl set-volume -l 1 "$sink" 5%+ ;;
+  volume-down)
+    wpctl set-volume "$sink" 5%- ;;
+  volume-mute)
+    wpctl set-mute "$sink" toggle ;;
+  mic-mute)
+    wpctl set-mute "$source" toggle
+    info=$(wpctl get-volume "$source")
+    [[ "$info" == *MUTED* ]] && notify-send -a "Chromebook controls" -t 1300 "Microphone muted" || notify-send -a "Chromebook controls" -t 1300 "Microphone unmuted"
+    exit 0 ;;
+  brightness-up)
+    brightnessctl -c backlight -e4 -n2 set 5%+ >/dev/null
+    value=$(brightnessctl -c backlight -m | cut -d, -f4 | tr -d '%')
+    notify_progress "Brightness" "$value" 5402
+    exit 0 ;;
+  brightness-down)
+    brightnessctl -c backlight -e4 -n2 set 5%- >/dev/null
+    value=$(brightnessctl -c backlight -m | cut -d, -f4 | tr -d '%')
+    notify_progress "Brightness" "$value" 5402
+    exit 0 ;;
+  *)
+    echo 'Usage: hypr-controls {volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down}' >&2
+    exit 2 ;;
+esac
+info=$(wpctl get-volume "$sink")
+value=$(awk '{printf "%.0f", $2*100}' <<<"$info")
+if [[ "$info" == *MUTED* ]]; then
+  notify-send -a "Chromebook controls" -t 1200 -r 5401 "Volume muted"
+else
+  notify_progress "Volume" "$value" 5401
+fi

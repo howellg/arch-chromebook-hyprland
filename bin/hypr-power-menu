@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Hyprland power menu, using Wofi. No system action is taken without a selection.
+set -euo pipefail
+
+style="$HOME/.config/wofi/power.css"
+
+choose() {
+    wofi --dmenu --no-custom-entry --insensitive --width 370 --height 285 --lines 5 --prompt "System" --style "$style"
+}
+
+confirm() {
+    local action="$1"
+    local answer
+    answer=$(printf '%s\n' "Cancel" "Confirm $action" | wofi --dmenu --no-custom-entry --width 370 --height 145 --lines 2 --prompt "$action?" --style "$style") || return 1
+    [[ "$answer" == "Confirm $action" ]]
+}
+
+selection=$(
+    printf '%s\n' \
+        '󰌾  Lock screen' \
+        '󰤄  Suspend' \
+        '󰍃  Log out' \
+        '󰑓  Restart' \
+        '󰐥  Shut down' | choose
+) || exit 0
+
+case "$selection" in
+    '󰌾  Lock screen')
+        loginctl lock-session
+        ;;
+    '󰤄  Suspend')
+        if confirm "Suspend"; then systemctl suspend; fi
+        ;;
+    '󰍃  Log out')
+        if confirm "Log out"; then hyprctl dispatch 'hl.dsp.exit()'; fi
+        ;;
+    '󰑓  Restart')
+        if confirm "Restart"; then systemctl reboot; fi
+        ;;
+    '󰐥  Shut down')
+        if confirm "Shut down"; then systemctl poweroff; fi
+        ;;
+esac

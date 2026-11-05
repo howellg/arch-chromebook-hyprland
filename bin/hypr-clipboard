@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Search and restore copied text and image data from cliphist.
+set -euo pipefail
+if [[ "${1:-}" == "--clear" ]]; then
+  cliphist wipe
+  notify-send -a "Clipboard" "Clipboard history cleared"
+  exit 0
+fi
+list=$(cliphist list 2>/dev/null || :)
+if [[ -z "$list" ]]; then
+  notify-send -a "Clipboard" "History is empty" "Copy text or an image first."
+  exit 0
+fi
+choice=$(printf '%s\n' "$list" | wofi --dmenu --no-custom-entry --insensitive \
+    --width 720 --height 470 --lines 14 \
+    --prompt "Clipboard history · type to search" \
+    --style "$HOME/.config/wofi/launcher.css") || exit 0
+[[ -n "$choice" ]] || exit 0
+id=${choice%%$'\t'*}
+mime=$(cliphist list -fields mime "$id" 2>/dev/null || :)
+if [[ "$mime" == image/* ]]; then
+  cliphist decode "$id" | wl-copy --type "$mime"
+else
+  cliphist decode "$id" | wl-copy
+fi

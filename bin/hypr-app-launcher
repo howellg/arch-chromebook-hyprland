@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Unified Catppuccin Wofi launcher for Hyprland on the Chromebook.
+exec wofi \
+    --show drun \
+    --insensitive \
+    --width 560 \
+    --height 430 \
+    --lines 9 \
+    --allow-images \
+    --prompt "Search applications..." \
+    --style "$HOME/.config/wofi/launcher.css"

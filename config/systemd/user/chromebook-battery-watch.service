@@ -1,0 +1,6 @@
+[Unit]
+Description=Chromebook battery level notifier (20/10/5 percent)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/chromebook-battery-watch

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Called periodically by a user timer. Never suspends without explicit opt-in.
+set -euo pipefail
+battery=/sys/class/power_supply/BAT0
+[[ -r "$battery/capacity" && -r "$battery/status" ]] || exit 0
+capacity=$(<"$battery/capacity")
+status=$(<"$battery/status")
+state="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/chromebook-battery-notified"
+if [[ "$status" != Discharging ]]; then
+  rm -f "$state"
+  exit 0
+fi
+[[ "$capacity" =~ ^[0-9]+$ ]] || exit 0
+previous=$(cat "$state" 2>/dev/null || echo 100)
+[[ "$previous" =~ ^[0-9]+$ ]] || previous=100
+threshold=100
+if (( capacity <= 5 )); then threshold=5
+elif (( capacity <= 10 )); then threshold=10
+elif (( capacity <= 20 )); then threshold=20
+fi
+if (( threshold < previous )); then
+  printf '%s\n' "$threshold" > "$state"
+  if (( threshold <= 5 )); then
+    notify-send -a "Chromebook battery" -u critical -t 0 "Battery critical: $capacity%" "Please plug in your Chromebook or save your work."
+  else
+    notify-send -a "Chromebook battery" -u normal -t 14000 "Battery low: $capacity%" "Consider plugging in soon."
+  fi
+fi
+# Disabled by default: unattended suspend risks data loss.
+# To opt in, set CHROMEBOOK_AUTO_SUSPEND=1 in the service environment.
+if (( capacity <= 3 )) && [[ "${CHROMEBOOK_AUTO_SUSPEND:-0}" == 1 ]]; then
+  systemctl suspend
+fi

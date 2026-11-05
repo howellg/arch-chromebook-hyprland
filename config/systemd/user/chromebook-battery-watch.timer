@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Chromebook battery level every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=20s
+Unit=chromebook-battery-watch.service
+
+[Install]
+WantedBy=timers.target

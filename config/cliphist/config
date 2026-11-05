@@ -1,0 +1,5 @@
+# Clipboard history is stored locally and unencrypted.
+# Reduce retained history on a low-RAM laptop.
+max-items 120
+max-store-size 5MiB
+max-dedupe-search 60

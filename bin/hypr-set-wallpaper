@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Set a persistent wallpaper; no change until a file is provided.
+set -euo pipefail
+if [[ $# -ne 1 || ! -f "$1" ]]; then
+    echo "Usage: hypr-set-wallpaper /full/path/to/image.png" >&2
+    echo "Tip: keep wallpaper files in ~/Pictures/Wallpapers/" >&2
+    exit 2
+fi
+image=$(realpath -- "$1")
+case "${image,,}" in
+    *.png|*.jpg|*.jpeg|*.webp|*.jxl) ;;
+    *) echo "Expected PNG, JPG, WebP, or JXL wallpaper" >&2; exit 2 ;;
+esac
+cfg="$HOME/.config/hypr/hyprpaper.conf"
+cat > "$cfg" <<EOF
+wallpaper {
+    monitor =
+    path = $image
+    fit_mode = cover
+}
+splash = false
+EOF
+if pgrep -x hyprpaper >/dev/null; then
+    pkill -x hyprpaper
+fi
+nohup hyprpaper > "$HOME/.cache/hyprpaper.log" 2>&1 < /dev/null &
+echo "Wallpaper configured: $image"

@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Chromebook Overview key: searchable list of Hyprland windows."""
+import json
+import re
+import subprocess
+import sys
+
+try:
+    windows = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+    print(f"Unable to retrieve windows: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+rows = []
+selected_by_row = {}
+for win in windows:
+    if not win.get("mapped", True):
+        continue
+    address = win.get("address", "")
+    if not re.fullmatch(r"0x[0-9a-fA-F]+", address):
+        continue
+    workspace = win.get("workspace", {}) or {}
+    wid = workspace.get("name", workspace.get("id", "?"))
+    title = " ".join(str(win.get("title") or "(untitled)").split())[:55]
+    klass = " ".join(str(win.get("class") or "Application").split())[:24]
+    row = f"󰍹  {wid:<9}  {title:<55}  [{klass}]"
+    # Avoid duplicate rows if windows have same titles.
+    if row in selected_by_row:
+        row += f" {address}"
+    rows.append(row)
+    selected_by_row[row] = address
+
+if not rows:
+    sys.exit(0)
+
+command = [
+    "wofi", "--dmenu", "--no-custom-entry", "--insensitive",
+    "--width", "850", "--height", "500", "--lines", "13",
+    "--prompt", "Switch to window...",
+    "--style", "@HOME@/.config/wofi/launcher.css",
+]
+result = subprocess.run(command, input="\n".join(rows) + "\n",
+                        text=True, stdout=subprocess.PIPE, check=False)
+chosen = result.stdout.strip()
+if result.returncode or chosen not in selected_by_row:
+    sys.exit(0)
+
+address = selected_by_row[chosen]
+subprocess.run(["hyprctl", "dispatch",
+                f'hl.dsp.focus({{ window = "address:{address}" }})'],
+               check=False, stdout=subprocess.DEVNULL)

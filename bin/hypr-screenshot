@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Hyprland screenshots for a Chromebook keyboard (no Print Screen key).
+set -euo pipefail
+
+mode="${1:-region-copy}"
+dir="$HOME/Pictures/Screenshots"
+mkdir -p "$dir"
+timestamp=$(date '+%Y-%m-%d_%H-%M-%S')
+filename="$dir/Screenshot_${timestamp}_$$.png"
+
+case "$mode" in
+    region-copy|region-save)
+        # On Escape, slurp exits nonzero; don't take or overwrite a screenshot.
+        geometry=$(slurp) || exit 0
+        [[ -n "$geometry" ]] || exit 0
+        if [[ "$mode" == region-copy ]]; then
+            grim -g "$geometry" - | wl-copy --type image/png
+        else
+            grim -g "$geometry" "$filename"
+            notify-send -a "Screenshot" "Region saved" "$filename"
+        fi
+        ;;
+    full-copy)
+        grim - | wl-copy --type image/png
+        ;;
+    full-save)
+        grim "$filename"
+        notify-send -a "Screenshot" "Screen saved" "$filename"
+        ;;
+    *)
+        printf 'Usage: %s {region-copy|region-save|full-copy|full-save}\n' "$0" >&2
+        exit 2
+        ;;
+esac

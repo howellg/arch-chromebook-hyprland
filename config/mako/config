@@ -1,0 +1,26 @@
+# Mako notifications — Catppuccin Mocha
+font=JetBrainsMono Nerd Font 11
+background-color=#1e1e2ef5
+text-color=#cdd6f4
+border-color=#89b4fa
+border-size=2
+border-radius=12
+width=355
+height=120
+padding=13
+margin=8
+outer-margin=54,12,12,12
+anchor=top-right
+max-visible=3
+default-timeout=6500
+ignore-timeout=0
+icons=1
+max-icon-size=48
+progress-color=over #89b4fa
+
+[urgency=critical]
+border-color=#f38ba8
+default-timeout=0
+
+[mode=do-not-disturb]
+invisible=1
