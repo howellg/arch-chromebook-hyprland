@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+path=$("$HOME/.local/bin/hypr-classroom-core" backup)
+notify-send -a "Chromebook backup" -t 5000 "Configuration saved" "$path"

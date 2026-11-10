@@ -186,22 +186,22 @@ hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "
 hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "quick" })
 
 -- Ref https://wiki.hypr.land/configuring/core/rules/workspace-rules/
--- "Smart gaps" / "No gaps when only"
--- uncomment all if you wish to use that.
--- hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 0, gaps_in = 0 })
--- hl.workspace_rule({ workspace = "f[1]",   gaps_out = 0, gaps_in = 0 })
--- hl.window_rule({
---     name  = "no-gaps-wtv1",
---     match = { float = false, workspace = "w[tv1]" },
---     border_size = 0,
---     rounding    = 0,
--- })
--- hl.window_rule({
---     name  = "no-gaps-f1",
---     match = { float = false, workspace = "f[1]" },
---     border_size = 0,
---     rounding    = 0,
--- })
+-- Smart gaps: remove outer/inner gaps and decorations only when one
+-- tiled window occupies the workspace. Multi-window layouts retain gaps.
+hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 0, gaps_in = 0 })
+hl.workspace_rule({ workspace = "f[1]", gaps_out = 0, gaps_in = 0 })
+hl.window_rule({
+    name = "no-gaps-single-tiled",
+    match = { float = false, workspace = "w[tv1]" },
+    border_size = 0,
+    rounding = 0,
+})
+hl.window_rule({
+    name = "no-gaps-fullscreen",
+    match = { float = false, workspace = "f[1]" },
+    border_size = 0,
+    rounding = 0,
+})
 
 -- See https://wiki.hypr.land/configuring/layouts/dwindle-layout/ for more
 hl.config({
@@ -431,15 +431,22 @@ hl.window_rule({
     match = { class = "^firefox$" },
     workspace = "1",
 })
+-- Regular Kitty terminals go to workspace 2. Desktop Commander uses a
+-- separate window class and retains its dedicated workspace 9.
 hl.window_rule({
-    name = "vscode-workspace-2",
-    match = { class = "^(code|Code|code-oss|com[.]microsoft[.]VSCode)$" },
+    name = "terminal-workspace-2",
+    match = { class = "^(kitty)$" },
     workspace = "2",
 })
 hl.window_rule({
-    name = "discord-workspace-3",
-    match = { class = "^(discord|Discord)$" },
+    name = "vscode-workspace-3",
+    match = { class = "^(code|Code|code-oss|com[.]microsoft[.]VSCode)$" },
     workspace = "3",
+})
+hl.window_rule({
+    name = "discord-workspace-4",
+    match = { class = "^(discord|Discord)$" },
+    workspace = "4",
 })
 -- Keep utility windows floating, centered and comfortably sized.
 hl.window_rule({

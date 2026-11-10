@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Chromebook Classroom Center
+Comment=Battery, backups, Wi-Fi, study timer, screenshot OCR, Arch updates and sync status
+Exec=@HOME@/.local/bin/hypr-classroom-center
+Icon=applications-education
+Terminal=false
+Categories=Education;
+Keywords=classroom;study;backups;wifi;battery;syncthing;tailscale;OCR;update;

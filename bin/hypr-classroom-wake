@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wake handling never restarts Wi-Fi, drops current connections or suspends.
+hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1 || :
+/home/garret/.local/bin/hypr-classroom-core resume >/dev/null 2>&1 || :

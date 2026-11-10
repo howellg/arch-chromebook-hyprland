@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Classroom utilities for the Arch/Hyprland Chromebook. No root or destructive automatic actions."""
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess as sp
+import sys
+import tarfile
+import tempfile
+import time
+
+HOME=Path.home()
+STATE=HOME/".local/state/chromebook-classroom"
+ARCHIVES=HOME/".local/state/chromebook-backups"
+CONFIG=HOME/".config/chromebook"
+BACKUP_PATHS=[".config/hypr/hyprland.lua",".config/hypr/hypridle.conf",
+ ".config/hypr/hyprlock.conf",".config/waybar/config.jsonc",
+ ".config/waybar/style.css",".config/mako/config",
+ ".config/wofi/launcher.css",".config/chromebook/quick-settings.css",
+ ".config/fish/config.fish"]
+for p in (STATE,ARCHIVES,CONFIG):p.mkdir(parents=True,exist_ok=True)
+
+def run(args,timeout=8):
+    try:
+        p=sp.run(args,text=True,capture_output=True,timeout=timeout)
+        return p.returncode,p.stdout.strip(),p.stderr.strip()
+    except (OSError,sp.TimeoutExpired) as e:return 127,"",str(e)
+
+def notify(title,msg):
+    if shutil.which("notify-send"):sp.Popen(["notify-send","-a","Classroom","-t","7000",title,msg],stdout=sp.DEVNULL,stderr=sp.DEVNULL)
+
+def battery():
+    bat=Path("/sys/class/power_supply/BAT0")
+    def val(name):
+        try:return (bat/name).read_text().strip()
+        except OSError:return "?"
+    pct=val("capacity");status=val("status")
+    v=val("voltage_now");power=val("power_now");current=val("current_now")
+    watts="unknown"
+    try:
+        watts=float(power)/1000000 if power!="?" else float(v)*float(current)/1000000000000
+        watts=f"{watts:.2f} W"
+    except (ValueError,TypeError):pass
+    health="unknown"
+    try:
+        full=int(val("energy_full") if val("energy_full")!="?" else val("charge_full"))
+        design=int(val("energy_full_design") if val("energy_full_design")!="?" else val("charge_full_design"))
+        health=f"{100*full/design:.0f}%" if design else health
+    except (ValueError,ZeroDivisionError):pass
+    _,profile,_=run(["powerprofilesctl","get"])
+    mode=(CONFIG/"power-mode").read_text().strip() if (CONFIG/"power-mode").exists() else "auto"
+    return f"Battery: {pct}% ({status})  •  draw: {watts}  •  health estimate: {health}\nPower profile: {profile or 'unknown'}  •  policy: {mode}"
+
+def net():
+    _,lines,_=run(["nmcli","-t","-f","DEVICE,TYPE,STATE,CONNECTION","device","status"])
+    _,wifi,_=run(["nmcli","-t","-f","IN-USE,SSID,SIGNAL,SECURITY","device","wifi","list","--rescan","no"])
+    _,route,_=run(["ip","route","get","1.1.1.1"])
+    _,dns,_=run(["resolvectl","status"],timeout=5)
+    dnsline=next((s.strip() for s in dns.splitlines() if "Current DNS Server:" in s),"DNS: see resolvectl")
+    return "Interfaces:\n"+(lines or "(none)")+"\n\nAccess points (cached):\n" + "\n".join(wifi.splitlines()[:8])+"\n\nRoute: "+(route.splitlines()[0] if route else "none")+"\n"+dnsline
+
+def recover():
+    # Only rescan. Never disconnect the current connection or force a new Wi-Fi profile.
+    _,state,_=run(["nmcli","radio","wifi"])
+    if state.lower()!="enabled":return "Wi-Fi radio disabled; leaving it disabled."
+    _,devices,_=run(["nmcli","-t","-f","DEVICE,TYPE,STATE","device","status"])
+    if any(":wifi:connected" in s for s in devices.splitlines()):
+        return "Wi-Fi already connected; no network changes made."
+    rc,_,err=run(["nmcli","device","wifi","rescan"],timeout=10)
+    return "Requested a safe Wi-Fi rescan. NetworkManager handles reconnection." if rc==0 else "Wi-Fi rescan: "+err
+
+def resume():
+    # Called by hypridle only AFTER resume. Does not restart NetworkManager or terminate a connection.
+    time.sleep(3)
+    result=recover()
+    (STATE/"last-resume").write_text(dt.datetime.now().isoformat(timespec="seconds")+" "+result+"\n")
+    # existing display profile auto mode is opt-in; never force a profile
+    script=HOME/".local/bin/hypr-display-profile"
+    if script.exists():
+        run([str(script),"auto","apply"],timeout=8) if (CONFIG/"display-auto-enabled").exists() else None
+    return result
+
+def backup():
+    name="chromebook-config-"+dt.datetime.now().strftime("%Y%m%d-%H%M%S")+".tar.gz"
+    dest=ARCHIVES/name
+    with tarfile.open(dest,"w:gz") as tar:
+        for relative in BACKUP_PATHS:
+            source=HOME/relative
+            if source.is_file() and not source.is_symlink():
+                tar.add(source,arcname=relative,recursive=False)
+        notes=STATE/"backup-manifest.txt"
+        notes.write_text("Contains only selected configuration files; not a full system snapshot or coursework backup.\n")
+        tar.add(notes,arcname="MANIFEST.txt")
+    dest.chmod(0o600)
+    return str(dest)
+
+def backups():
+    return sorted(ARCHIVES.glob("chromebook-config-*.tar.gz"),reverse=True)
+
+def restore(filename):
+    file=ARCHIVES/Path(filename).name
+    if not file.is_file() or file not in backups():raise ValueError("Unknown backup")
+    allowed=set(BACKUP_PATHS)
+    with tarfile.open(file,"r:gz") as tar:
+        members=[m for m in tar.getmembers() if m.name in allowed and m.isfile() and not m.issym()]
+        # Safety copy of current configuration before restoring
+        safety=backup()
+        for m in members:
+            target=HOME/m.name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            with tar.extractfile(m) as src, open(target,"wb") as dst:
+                shutil.copyfileobj(src,dst)
+            target.chmod(0o600 if "config.fish" in m.name else 0o644)
+    return f"Restored {len(members)} settings from {file.name}. Pre-restore safety copy: {safety}. Reload Hyprland if needed."
+
+def sync():
+    result=[]
+    for label,args in (("Syncthing",["systemctl","--user","is-active","syncthing.service"]),
+                       ("Tailscale daemon",["systemctl","is-active","tailscaled.service"])):
+        _,out,_=run(args);result.append(f"{label}: {out or 'unknown'}")
+    rc,output,err=run(["tailscale","status"],timeout=6)
+    result.append("Tailscale: "+(output[:650] if rc==0 else "not connected / daemon inactive"))
+    result.append("Syncthing GUI (when running): http://127.0.0.1:8384")
+    return "\n".join(result)
+
+def updates():
+    # pacman -Qu consults local package DB; does NOT sync/install.
+    rc,out,err=run(["pacman","-Qu"],timeout=20)
+    if rc not in (0,1):return "Check failed: "+(err or f"exit {rc}")
+    pkgs=out.splitlines()
+    return f"{len(pkgs)} available updates (cached package metadata; may be stale).\n"+("\n".join(pkgs[:35]) if pkgs else "No updates listed in local package DB.")+"\n\nTo update manually: sudo pacman -Syu"
+
+def ocr(mode="region"):
+    if not all(shutil.which(s) for s in ("grim","slurp","tesseract","wl-copy")):
+        raise RuntimeError("Need grim, slurp, tesseract and wl-copy")
+    if mode=="region":
+        rc,geo,_=run(["slurp"],timeout=120)
+        if rc!=0 or not geo:return "Selection cancelled"
+        capture=["grim","-g",geo]
+    else:capture=["grim"]
+    with tempfile.TemporaryDirectory(prefix="chromebook-ocr-") as tmp:
+        image=Path(tmp)/"capture.png"
+        rc,_,err=run(capture+[str(image)],timeout=25)
+        if rc:raise RuntimeError("Screenshot failed: "+err)
+        rc,out,err=run(["tesseract",str(image),"stdout"],timeout=35)
+        if rc:raise RuntimeError("OCR failed: "+err)
+        if not out.strip():return "No text detected"
+        sp.run(["wl-copy","--type","text/plain"],input=out,text=True,timeout=8,check=True)
+        return f"Copied {len(out)} OCR characters to clipboard.\n\n"+out[:2000]
+
+def coursework_backup():
+    """Manual archive of Documents and Projects, excluding caches and huge files."""
+    dest=ARCHIVES/("chromebook-coursework-"+dt.datetime.now().strftime("%Y%m%d-%H%M%S")+".tar.gz")
+    skipped=0
+    with tarfile.open(dest,"w:gz") as tar:
+        for directory in ("Documents","Projects"):
+            base=HOME/directory
+            if not base.is_dir():continue
+            for root,dirs,files in os.walk(base,followlinks=False):
+                dirs[:]=[d for d in dirs if d not in (".git","node_modules",".venv","__pycache__") and not (Path(root)/d).is_symlink()]
+                for name in files:
+                    src=Path(root)/name
+                    try:
+                        if src.is_symlink() or not src.is_file() or src.stat().st_size>100*1024*1024:
+                            skipped+=1;continue
+                        tar.add(src,arcname=str(src.relative_to(HOME)),recursive=False)
+                    except (OSError,PermissionError):skipped+=1
+    dest.chmod(0o600)
+    return f"Saved {dest}. Skipped {skipped} links/large/unreadable files. Local only; not off-device backup."
+
+def coursework_restore(filename):
+    source=ARCHIVES/Path(filename).name
+    if not source.is_file() or not source.name.startswith("chromebook-coursework-"):raise ValueError("Unknown coursework archive")
+    destination=HOME/"Restored-Coursework"/source.name.removesuffix(".tar.gz")
+    destination.mkdir(parents=True,exist_ok=False)
+    count=0
+    with tarfile.open(source,"r:gz") as tar:
+        for member in tar.getmembers():
+            parts=Path(member.name).parts
+            if len(parts)<2 or parts[0] not in ("Documents","Projects") or not member.isfile() or member.issym() or member.islnk() or ".." in parts:continue
+            target=destination.joinpath(*parts)
+            target.parent.mkdir(parents=True,exist_ok=True)
+            with tar.extractfile(member) as src, target.open("wb") as dst:shutil.copyfileobj(src,dst)
+            count+=1
+    return f"Restored {count} files to {destination}. No current files were overwritten."
+
+def main():
+    command=sys.argv[1] if len(sys.argv)>1 else "help"
+    if command=="battery":print(battery())
+    elif command=="net":print(net())
+    elif command=="recover":print(recover())
+    elif command=="resume":print(resume())
+    elif command=="backup":print(backup())
+    elif command=="backups":print("\n".join(str(x) for x in backups()))
+    elif command=="restore":
+        if len(sys.argv)!=3:raise SystemExit("Specify backup filename; restoration overwrites saved settings")
+        print(restore(sys.argv[2]))
+    elif command=="coursework-backup":print(coursework_backup())
+    elif command=="coursework-list":print("\n".join(str(p) for p in sorted(ARCHIVES.glob("chromebook-coursework-*.tar.gz"),reverse=True)))
+    elif command=="coursework-restore":
+        if len(sys.argv)!=3:raise SystemExit("Specify coursework archive")
+        print(coursework_restore(sys.argv[2]))
+    elif command=="sync":print(sync())
+    elif command=="updates":print(updates())
+    elif command=="ocr":
+        result=ocr(sys.argv[2] if len(sys.argv)>2 else "region")
+        print(result);notify("Screenshot OCR",result[:90])
+    else:print("Usage: hypr-classroom-core battery|net|recover|resume|backup|backups|restore FILE|sync|updates|ocr [region|full]")
+if __name__=="__main__":main()

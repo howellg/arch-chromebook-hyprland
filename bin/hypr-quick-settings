@@ -25,15 +25,18 @@ def run(*args):
 class Settings(Gtk.Window):
     def __init__(self):
         super().__init__(title="Chromebook · Quick Settings")
-        self.set_default_size(470, 710)
-        self.set_resizable(False)
+        self.set_default_size(470, 700)
+        self.set_resizable(True)
         self.set_border_width(16)
         self.get_style_context().add_class("quick-settings")
         self.connect("key-press-event", lambda _w, e: self.close() if e.keyval == Gdk.KEY_Escape else False)
         self.connect("destroy", Gtk.main_quit)
         self.mute_changes = True
         main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.add(main)
+        viewport = Gtk.ScrolledWindow()
+        viewport.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.add(viewport)
+        viewport.add_with_viewport(main)
         title = Gtk.Label(label="󰀻  Quick Settings")
         title.set_xalign(0)
         title.get_style_context().add_class("heading")
@@ -69,6 +72,9 @@ class Settings(Gtk.Window):
             ("App Layouts", str(HOME / ".local/bin/hypr-layouts")),
             ("Displays", str(HOME / ".local/bin/hypr-displays")),
             ("Maintenance", str(HOME / ".local/bin/hypr-maintenance")),
+            ("Classroom", str(HOME / ".local/bin/hypr-classroom-center")),
+            ("OCR Text", str(HOME / ".local/bin/hypr-classroom-ocr")),
+            ("Backups", str(HOME / ".local/bin/hypr-classroom-backup")),
             ("First-Run", str(HOME / ".local/bin/hypr-first-run")),
             ("Power", str(HOME / ".local/bin/hypr-power-menu")),
             ("Close", None),

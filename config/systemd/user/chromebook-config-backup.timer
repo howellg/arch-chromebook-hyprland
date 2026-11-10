@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Chromebook configuration backups
+
+[Timer]
+OnCalendar=*-*-* 18:00
+Persistent=true
+RandomizedDelaySec=15min
+Unit=chromebook-config-backup.service
+
+[Install]
+WantedBy=timers.target

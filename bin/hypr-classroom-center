@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Classroom dashboard: explicit user actions, no automatic system changes on open."""
+import datetime as dt
+from pathlib import Path
+import subprocess
+import threading
+import gi
+gi.require_version("Gtk","3.0")
+from gi.repository import Gtk,GLib,Gdk
+
+H=Path.home()
+CORE=str(H/".local/bin/hypr-classroom-core")
+BIN=H/".local/bin"
+TASKS=H/".local/share/chromebook-study/tasks.txt"
+TASKS.parent.mkdir(parents=True,exist_ok=True)
+if not TASKS.exists():TASKS.write_text("# One assignment or task per line. Edit and click Save.\n")
+def call(args,timeout=25):
+    try:
+        p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+        return (p.stdout or p.stderr).strip() or ("Completed" if p.returncode==0 else f"Exit code {p.returncode}")
+    except Exception as e:return str(e)
+def launch(args):
+    try:subprocess.Popen(args,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+    except Exception as e:print(e)
+class Dashboard(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Chromebook · Classroom Center")
+        self.set_default_size(760,620)
+        self.set_border_width(12)
+        self.connect("destroy",Gtk.main_quit)
+        self.connect("key-press-event",lambda w,e:self.destroy() if e.keyval==Gdk.KEY_Escape else False)
+        self.tabs=Gtk.Notebook()
+        self.add(self.tabs)
+        self.labels={}
+        self.page("Battery",self.battery)
+        self.page("Backups",self.backup)
+        self.page("Network",self.network)
+        self.page("Study",self.study)
+        self.page("Resume",self.resume)
+        self.page("Screenshots",self.screens)
+        self.page("Updates",self.updates)
+        self.page("Sync",self.sync)
+        self.show_all()
+    def page(self,name,builder):
+        box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
+        box.set_border_width(12)
+        self.tabs.append_page(box,Gtk.Label(label=name))
+        builder(box)
+    def heading(self,box,title,description):
+        l=Gtk.Label()
+        l.set_markup("<b>"+GLib.markup_escape_text(title)+"</b>")
+        l.set_xalign(0);box.pack_start(l,False,False,0)
+        l=Gtk.Label(label=description);l.set_line_wrap(True);l.set_xalign(0)
+        box.pack_start(l,False,False,0)
+    def info(self,box,key):
+        s=Gtk.ScrolledWindow();s.set_hexpand(True);s.set_vexpand(True)
+        view=Gtk.TextView();view.set_editable(False);view.set_monospace(True);view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        s.add(view);box.pack_start(s,True,True,0)
+        self.labels[key]=view.get_buffer()
+    def button(self,box,label,func):
+        b=Gtk.Button(label=label);b.connect("clicked",lambda *_:func());box.pack_start(b,False,False,0)
+    def row(self,box,items):
+        row=Gtk.Box(spacing=8);box.pack_start(row,False,False,0)
+        for title,fn in items:
+            b=Gtk.Button(label=title);b.connect("clicked",lambda _w,f=fn:f());row.pack_start(b,True,True,0)
+    def set(self,key,value):
+        self.labels[key].set_text(value)
+    def work(self,key,args,timeout=25):
+        self.set(key,"Working…")
+        def do():
+            result=call(args,timeout)
+            GLib.idle_add(self.set,key,result)
+        threading.Thread(target=do,daemon=True).start()
+    def battery(self,b):
+        self.heading(b,"Power and battery","Existing auto power policy uses balanced on AC, power-saver on battery. Manual modes are respected.")
+        self.row(b,[(x.title(),lambda m=x:self.work("battery",[str(BIN/"hypr-power-profile"),m])) for x in ("auto","power-saver","balanced")])
+        self.button(b,"Refresh battery details",lambda:self.work("battery",[CORE,"battery"]))
+        self.info(b,"battery");self.work("battery",[CORE,"battery"])
+    def backup(self,b):
+        self.heading(b,"Configuration backups","Creates small local archives of Hyprland/Waybar settings. NOT a system snapshot or a backup of coursework.")
+        self.row(b,[("Create backup",self.make_backup),("List backups",lambda:self.work("backups",[CORE,"backups"]))])
+        self.backup_list=Gtk.ComboBoxText();b.pack_start(self.backup_list,False,False,0)
+        self.button(b,"Restore selected backup (asks for confirmation)",self.confirm_restore)
+        self.row(b,[("Back up Documents + Projects",self.make_coursework),("Refresh coursework list",self.refresh_coursework)])
+        self.coursework_list=Gtk.ComboBoxText();b.pack_start(self.coursework_list,False,False,0)
+        self.button(b,"Restore coursework copy into Restored-Coursework (never overwrites live files)",self.confirm_coursework)
+        self.info(b,"backups");self.refresh_backups();self.refresh_coursework()
+    def refresh_backups(self):
+        self.backup_list.remove_all()
+        output=call([CORE,"backups"])
+        for f in output.splitlines():
+            if f.endswith(".tar.gz"):self.backup_list.append_text(Path(f).name)
+        if self.backup_list.get_model() and len(self.backup_list.get_model()):self.backup_list.set_active(0)
+        self.set("backups",output or "No backups yet.")
+    def make_backup(self):
+        self.work("backups",[CORE,"backup"])
+        GLib.timeout_add_seconds(2,self._refresh_once)
+    def _refresh_once(self):self.refresh_backups();return False
+    def confirm_restore(self):
+        name=self.backup_list.get_active_text()
+        if not name:return
+        dialog=Gtk.MessageDialog(transient_for=self,flags=0,message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK_CANCEL,text="Restore configuration backup?")
+        dialog.format_secondary_text(f"This overwrites selected live desktop configuration files from {name}. A safety backup is made first. Applications will not be restarted.")
+        approved=dialog.run()==Gtk.ResponseType.OK;dialog.destroy()
+        if approved:self.work("backups",[CORE,"restore",name],timeout=40)
+    def refresh_coursework(self):
+        self.coursework_list.remove_all()
+        output=call([CORE,"coursework-list"])
+        for name in output.splitlines():
+            if name.endswith(".tar.gz"):self.coursework_list.append_text(Path(name).name)
+        if len(self.coursework_list.get_model()):self.coursework_list.set_active(0)
+    def make_coursework(self):
+        self.work("backups",[CORE,"coursework-backup"],timeout=120)
+        GLib.timeout_add_seconds(4,self._refresh_coursework_once)
+    def _refresh_coursework_once(self):
+        self.refresh_coursework()
+        return False
+    def confirm_coursework(self):
+        name=self.coursework_list.get_active_text()
+        if not name:return
+        dialog=Gtk.MessageDialog(transient_for=self,flags=0,message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,text="Extract coursework to a separate restore folder?")
+        dialog.format_secondary_text("Files are extracted to ~/Restored-Coursework. Existing coursework remains untouched.")
+        okay=dialog.run()==Gtk.ResponseType.OK
+        dialog.destroy()
+        if okay:self.work("backups",[CORE,"coursework-restore",name],timeout=120)
+    def network(self,b):
+        self.heading(b,"Campus Wi-Fi diagnostics","Inspect links and request a rescan. Never forget networks, disconnect, or restart NetworkManager automatically.")
+        self.row(b,[("Diagnose",lambda:self.work("net",[CORE,"net"])),("Safe rescan",lambda:self.work("net",[CORE,"recover"])),("Network settings",lambda:launch(["nm-connection-editor"]))])
+        self.info(b,"net");self.work("net",[CORE,"net"])
+    def study(self,b):
+        self.heading(b,"Classroom study board","Assignments stored locally in ~/.local/share/chromebook-study/tasks.txt. Timer runs while this window remains open.")
+        self.row(b,[("Firefox",lambda:launch(["firefox"])),("VS Code",lambda:launch(["code"])),("MySQL New",lambda:launch(["gtk-launch","mysql-workbench-new"])),("Files",lambda:launch(["dolphin",str(H/"Projects")]))])
+        self.timer_seconds=25*60;self.timer_active=False
+        self.timer_label=Gtk.Label(label="Focus timer: 25:00");b.pack_start(self.timer_label,False,False,0)
+        self.row(b,[("Start / Pause timer",self.toggle_timer),("Reset timer",self.reset_timer)])
+        self.editor=Gtk.TextView();self.editor.set_monospace(True);self.editor.get_buffer().set_text(TASKS.read_text())
+        scroll=Gtk.ScrolledWindow();scroll.add(self.editor);b.pack_start(scroll,True,True,0)
+        self.button(b,"Save study tasks",self.save_tasks)
+        GLib.timeout_add_seconds(1,self.tick)
+    def save_tasks(self):
+        buf=self.editor.get_buffer();start,end=buf.get_bounds();TASKS.write_text(buf.get_text(start,end,True))
+    def toggle_timer(self):self.timer_active=not self.timer_active
+    def reset_timer(self):
+        self.timer_active=False;self.timer_seconds=25*60;self.timer_label.set_text("Focus timer: 25:00")
+    def tick(self):
+        if self.timer_active:
+            self.timer_seconds-=1
+            if self.timer_seconds<=0:
+                self.reset_timer();launch(["notify-send","Focus session complete","Take a short break"])
+            else:self.timer_label.set_text(f"Focus timer: {self.timer_seconds//60:02d}:{self.timer_seconds%60:02d}")
+        return True
+    def resume(self,b):
+        self.heading(b,"Resume diagnostics","On waking, Hypridle enables the display and runs a delayed, non-disruptive Wi-Fi rescan if disconnected.")
+        self.button(b,"Read last resume status",self.resume_info)
+        self.info(b,"resume");self.resume_info()
+    def resume_info(self):
+        p=H/".local/state/chromebook-classroom/last-resume"
+        self.set("resume",p.read_text() if p.exists() else "No wake event recorded yet. Test by sleeping and waking at a convenient time.")
+    def screens(self,b):
+        self.heading(b,"OCR and annotation","Select part of the screen, extract text to clipboard, or annotate a capture with the existing editor.")
+        self.row(b,[("OCR region",lambda:self.work("screens",[CORE,"ocr","region"],timeout=180)),("OCR full screen",lambda:self.work("screens",[CORE,"ocr","full"],timeout=70))])
+        self.row(b,[("Annotate region",lambda:launch([str(BIN/"hypr-screenshot-edit"),"region"])),("Annotate full screen",lambda:launch([str(BIN/"hypr-screenshot-edit"),"full"]))])
+        self.info(b,"screens");self.set("screens","OCR uses Tesseract locally. Captures are temporary; recognized text is copied to clipboard.")
+    def updates(self,b):
+        self.heading(b,"Safe Arch updates","Review locally known pending updates. Nothing installs without an explicit terminal command.")
+        self.row(b,[("List cached updates",lambda:self.work("updates",[CORE,"updates"],timeout=40)),("Open update terminal",lambda:launch(["kitty","-e","bash","-lc","echo 'Review Arch news before upgrading; command: sudo pacman -Syu'; exec fish"]))])
+        self.button(b,"Read Arch Linux security and upgrade news",lambda:launch(["xdg-open","https://archlinux.org/news/"]))
+        self.info(b,"updates");self.work("updates",[CORE,"updates"],timeout=40)
+    def start_syncthing(self):
+        self.work("sync",["systemctl","--user","start","syncthing.service"],timeout=20)
+        GLib.timeout_add_seconds(3,self._refresh_sync_once)
+    def _refresh_sync_once(self):
+        self.work("sync",[CORE,"sync"])
+        return False
+    def sync(self,b):
+        self.heading(b,"Syncthing and Tailscale","Shows service health. These services were inactive when this was installed; no network services are enabled automatically.")
+        self.row(b,[("Refresh",lambda:self.work("sync",[CORE,"sync"])),("Start Syncthing (this session)",self.start_syncthing),("Syncthing web UI",lambda:launch(["xdg-open","http://127.0.0.1:8384"]))])
+        self.info(b,"sync");self.work("sync",[CORE,"sync"])
+Dashboard()
+Gtk.main()

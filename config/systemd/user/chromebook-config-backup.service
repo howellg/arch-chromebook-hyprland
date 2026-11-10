@@ -1,0 +1,6 @@
+[Unit]
+Description=Daily Chromebook desktop configuration archive
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hypr-classroom-core backup
