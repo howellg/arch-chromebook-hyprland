@@ -122,6 +122,24 @@ def sync():
         _,out,_=run(args);result.append(f"{label}: {out or 'unknown'}")
     rc,output,err=run(["tailscale","status"],timeout=6)
     result.append("Tailscale: "+(output[:650] if rc==0 else "not connected / daemon inactive"))
+    if result[0] == "Syncthing: active":
+        rc,raw,_=run(["syncthing","cli","show","connections"],timeout=7)
+        if rc==0:
+            try:
+                connections=json.loads(raw).get("connections",{})
+                online=sum(1 for data in connections.values() if data.get("connected"))
+                result.append(f"Syncthing peers: {online} connected / {len(connections)} known")
+            except (ValueError,AttributeError):result.append("Syncthing peer details unavailable")
+        rc,raw,_=run(["syncthing","cli","config","folders","list"],timeout=7)
+        if rc==0 and not raw:
+            result.append("No sync folders configured yet; nothing will sync.")
+        elif rc==0:
+            try:
+                folders=json.loads(raw)
+                if isinstance(folders,list):
+                    result.append(f"Configured Syncthing folders: {len(folders)}")
+                    if not folders:result.append("No sync folders configured yet; nothing will sync.")
+            except ValueError:pass
     result.append("Syncthing GUI (when running): http://127.0.0.1:8384")
     return "\n".join(result)
 

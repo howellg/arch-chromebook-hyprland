@@ -159,3 +159,7 @@ Hyprland now includes Class and Presentation Modes, KDE Connect support, a searc
 - Super+Shift+Q: full Quick Settings with App Layouts, Displays, Maintenance and First-Run buttons
 
 See [Desktop Integrations](docs/INTEGRATIONS.md) for setup, privacy, limitations, and testing. Scheduled DND, automatic app restoration, and monitor auto-restoration are disabled until explicitly enabled. Manual package upgrades still require confirmation and sudo. KDE Connect phone pairing and projector compatibility must be tested on the actual hardware.
+
+## Classroom Center (November 2026)
+
+A dedicated **Chromebook Classroom Center** now combines automatic battery optimization, local config/coursework backup and safe restore, campus Wi-Fi diagnostics, a study task board and 25-minute timer, post-suspend network checks, screenshot OCR, safe Arch update information, and Syncthing/Tailscale status. Search in Wofi or open Quick Settings → **Classroom**. The installer creates a desktop entry in `~/.local/share/applications` and enables the daily config-backup timer. Syncthing may be enabled separately; Tailscale requires privileged service startup and authentication. See [Classroom Center](docs/CLASSROOM.md) for full commands, limitations, and test results.
