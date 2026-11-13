@@ -5,6 +5,8 @@ import subprocess
 
 from arulia_vaults import VAULTS, arulia_vault_id, obsidian_open_uri, obsidian_vaults, syncthing_config
 
+from galactic_panel import reveal
+
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -82,6 +84,7 @@ class Launcher(Gtk.Window):
         self.matches = set(self.results.get_children())
         self.results.set_filter_func(lambda row: row in self.matches)
         self.filter_rows()
+        reveal(self)
         self.show_all()
         self.search.grab_focus()
 
