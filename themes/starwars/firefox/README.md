@@ -12,3 +12,8 @@ Enable `toolkit.legacyUserProfileCustomizations.stylesheets` in `about:config`
 and restart Firefox. Remove the import and restart to restore the previous
 appearance. The stylesheet targets Firefox’s browser window and retains its
 native controls, button actions and website favicons.
+
+For Imperial HoloNet on Firefox Home and New Tab, also copy `holonet.css`,
+`holonet-wordmark.svg`, and `holonet-viewport.svg` into the same directory.
+Add `@import url("holonet.css");` at the top of `chrome/userContent.css`.
+Restart Firefox. Remove that import and restart to restore the stock pages.
