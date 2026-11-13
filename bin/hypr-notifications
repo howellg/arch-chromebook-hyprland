@@ -48,9 +48,8 @@ def record(id_):
         pass
 
 
-def snapshot():
+def snapshot(daemon):
     items = {}
-    daemon = owner()
     if not daemon:
         return None
     for command in ("list", "history"):
@@ -70,8 +69,57 @@ def snapshot():
                                              (daemon,)))
         except sqlite3.Error:
             pass
-    return [(item, active, timestamps.get(id_))
+    seen = last_seen(daemon)
+    return [(item, active, timestamps.get(id_), id_ in timestamps and id_ > seen)
             for id_, (item, active) in sorted(items.items(), reverse=True)]
+
+
+def last_seen(daemon):
+    if TIMES.is_file():
+        try:
+            with sqlite3.connect(TIMES, timeout=0.2) as db:
+                row = db.execute("SELECT id FROM seen WHERE daemon = ?", (daemon,)).fetchone()
+                return row[0] if row else 0
+        except sqlite3.Error:
+            pass
+    return 0
+
+
+def acknowledge(daemon, items):
+    newest = max((item["id"] for item, _, _, unread in items if unread), default=0)
+    if not daemon or not newest:
+        return
+    with sqlite3.connect(TIMES) as db:
+        db.execute("CREATE TABLE IF NOT EXISTS seen (daemon TEXT PRIMARY KEY, id INTEGER)")
+        db.execute("DELETE FROM seen WHERE daemon != ?", (daemon,))
+        db.execute("INSERT INTO seen VALUES (?, ?) ON CONFLICT(daemon) "
+                   "DO UPDATE SET id = max(seen.id, excluded.id)", (daemon, newest))
+
+
+def waybar():
+    items = snapshot(owner())
+    unread = [item for item, _, _, new in items or () if new]
+    priority = sum(item.get("urgency") == "critical" for item in unread)
+    count = len(unread)
+    tooltip = "Fleet Communications · No unread alerts"
+    state = "clear"
+    if items is None:
+        tooltip, state = "Fleet Communications · Notification service unavailable", "offline"
+    elif count:
+        noun = "alert" if count == 1 else "alerts"
+        tooltip = f"Fleet Communications · {count} unread {noun}"
+        state = "unread"
+        if priority:
+            tooltip += f" · {priority} priority"
+            state = "priority"
+    modes = call("makoctl", "mode") or ""
+    quiet = DND in modes.splitlines()
+    classes = [state, "quiet"] if quiet else [state]
+    if quiet:
+        tooltip += "\nDo Not Disturb is on"
+    print(json.dumps({"text": "\ue904" + (f"  {count}" if count else ""),
+                      "tooltip": tooltip + "\nClick to open · Right-click to toggle Do Not Disturb",
+                      "class": classes}))
 
 
 def launch():
@@ -86,6 +134,7 @@ def launch():
     .fleet .dish { font-family: 'Galactic Sector'; color: #ed7775; font-size: 26px; }
     .fleet .muted { color: #acb6c8; }
     .fleet .subject { color: #f1e9ed; font-weight: bold; }
+    .fleet .unread { color: #ed9295; font-weight: bold; }
     .fleet .priority { color: #ff898d; font-weight: bold; }
     .fleet entry, .fleet button { background-image: none; background-color: #1c2330;
         color: #e7eaf0; border: 1px solid #3e4657; border-radius: 4px; box-shadow: none; }
@@ -123,6 +172,9 @@ def launch():
             self.connect("destroy", Gtk.main_quit)
             self.connect("key-press-event", self.on_key)
             self.items = None
+            self.daemon = None
+            self.opened = False
+            self.session_unread = set()
             self.syncing = False
 
             root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -138,7 +190,12 @@ def launch():
             self.search = Gtk.SearchEntry()
             self.search.set_placeholder_text("Search transmissions")
             self.search.connect("search-changed", self.render)
-            root.pack_start(self.search, False, False, 0)
+            filters = Gtk.Box(spacing=8)
+            root.pack_start(filters, False, False, 0)
+            filters.pack_start(self.search, True, True, 0)
+            self.unread_filter = Gtk.ToggleButton(label="Unread")
+            self.unread_filter.connect("toggled", self.render)
+            filters.pack_start(self.unread_filter, False, False, 0)
             scroll = Gtk.ScrolledWindow()
             scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
             root.pack_start(scroll, True, True, 0)
@@ -154,6 +211,9 @@ def launch():
                                   ("Dismiss visible", ("dismiss", "-a"))):
                 actions.pack_start(button(text, lambda _, cmd=command: self.action(*cmd)),
                                    False, False, 0)
+
+            self.mark_read = button("Mark all read", self.mark_all_read)
+            actions.pack_end(self.mark_read, False, False, 0)
 
             footer = Gtk.Box(spacing=7)
             root.pack_start(footer, False, False, 0)
@@ -187,8 +247,21 @@ def launch():
             return False
 
         def refresh(self):
-            current = snapshot()
-            if current != self.items:
+            daemon = owner()
+            current = snapshot(daemon)
+            daemon_changed = daemon != self.daemon
+            if daemon_changed and daemon:
+                self.session_unread.clear()
+                self.daemon = daemon
+            unread = {item["id"] for item, _, _, new in current or () if new}
+            self.session_unread.update(unread)
+            if current is not None and not self.opened:
+                self.opened = True
+                try:
+                    acknowledge(daemon, current)
+                except sqlite3.Error:
+                    self.status.set_text("Could not update unread status.")
+            if current != self.items or daemon_changed:
                 self.items = current
                 self.render()
             modes = call("makoctl", "mode")
@@ -207,9 +280,19 @@ def launch():
             query = self.search.get_text().casefold().split()
             if self.items is None:
                 self.empty.set_text("Notification service unavailable")
+                self.mark_read.set_sensitive(False)
                 return
-            self.empty.set_text("No matching transmissions" if query else "No transmissions yet")
-            for item, active, received in self.items:
+            only_unread = self.unread_filter.get_active()
+            count = sum(item["id"] in self.session_unread for item, *_ in self.items)
+            self.unread_filter.set_label(f"Unread · {count}" if count else "Unread")
+            self.mark_read.set_sensitive(bool(count))
+            empty = "No matching transmissions" if query else (
+                "No unread transmissions" if only_unread else "No transmissions yet")
+            self.empty.set_text(empty)
+            for item, active, received, _ in self.items:
+                unread = item["id"] in self.session_unread
+                if only_unread and not unread:
+                    continue
                 app = item.get("app_name") or "Unknown app"
                 summary = item.get("summary") or "(No subject)"
                 body = unescape(re.sub(r"</?(?:b|i|u|a|img)\b[^>]*>", "", item.get("body") or ""))
@@ -229,6 +312,8 @@ def launch():
                 meta.pack_start(app_label, True, True, 0)
                 if active:
                     meta.pack_start(label("ACTIVE", "muted"), False, False, 0)
+                if unread:
+                    meta.pack_start(label("NEW", "unread"), False, False, 0)
                 if critical:
                     meta.pack_start(label("PRIORITY", "priority"), False, False, 0)
                 stamp = datetime.fromtimestamp(received).strftime("%b %d · %H:%M") if received else ""
@@ -241,6 +326,21 @@ def launch():
                 row.add(content)
                 self.listbox.add(row)
             self.listbox.show_all()
+
+        def mark_all_read(self, *_):
+            daemon = owner()
+            current = snapshot(daemon)
+            if current is None:
+                self.status.set_text("Notification service unavailable.")
+                return
+            try:
+                acknowledge(daemon, current)
+            except sqlite3.Error:
+                self.status.set_text("Could not update unread status.")
+                return
+            self.session_unread.clear()
+            self.refresh()
+            self.render()
 
         def action(self, *command):
             if call("makoctl", *command) is None:
@@ -284,5 +384,7 @@ def launch():
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--record":
         record(sys.argv[2])
+    elif sys.argv[1:] == ["--waybar"]:
+        waybar()
     else:
         launch()

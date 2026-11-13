@@ -126,3 +126,12 @@ notifications, spot priority transmissions, and manage Do Not Disturb and
 scheduled quiet hours. Galactic themes record arrival times for new
 notifications in the session runtime directory. Earlier entries remain
 readable. Volume and brightness popups are excluded from the log.
+
+The Waybar comms dish counts unread alerts still in Mako and highlights
+unread priority alerts. Click it to open the log and acknowledge the current
+batch. The Unread filter keeps that batch available in the open window,
+along with new arrivals. Use Mark all read to clear those markers and
+acknowledge any alerts that arrived while the log was open.
+
+Right-click the dish to toggle Do Not Disturb. An amber top edge shows
+when quiet mode is active.
