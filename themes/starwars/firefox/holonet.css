@@ -29,6 +29,21 @@
       inline-size: clamp(120px, 23vw, 265px) !important;
     }
 
+    .search-inner-wrapper {
+      margin-block-start: 1.65rem !important;
+    }
+
+    .search-inner-wrapper::before {
+      content: "SEARCH THE HOLONET";
+      position: absolute;
+      inset-inline-start: 0;
+      bottom: calc(100% + .55rem);
+      color: #f18b88;
+      font: 700 .72rem monospace;
+      letter-spacing: .16em;
+      pointer-events: none;
+    }
+
     .search-handoff-button,
     .search-inner-wrapper > moz-urlbar {
       background-color: #171b26 !important;
