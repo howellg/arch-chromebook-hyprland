@@ -143,3 +143,8 @@ HoloNet Link panel for Tailscale and AruleWiki's actual Syncthing connection
 status. The panel refreshes every 15 seconds and has links to the local
 Syncthing dashboard and NetworkManager. Right-click the Waybar indicator
 to open NetworkManager directly.
+
+The Arulia Vaults card shows the DM and Player Syncthing folders, including
+scanning, pending changes, pause, errors, and completion with AruleWiki.
+Folder checks run while the panel is open. They read the local Syncthing
+API on loopback and leave the vaults and Syncthing settings untouched.

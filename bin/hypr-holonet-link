@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Show the Chromebook's Wi-Fi, Tailscale, and Syncthing relay status."""
+from concurrent.futures import ThreadPoolExecutor
 from html import escape
 import json
 from pathlib import Path
 import subprocess
 import sys
 from threading import Thread
+from urllib.parse import urlencode, urlsplit
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from xml.etree import ElementTree
 
 RELAY = "AruleWiki"
 NETWORK_MANAGER = "nm-connection-editor"
 SYNCTHING_DASHBOARD = "http://127.0.0.1:8384"
+VAULTS = ("DM", "Player")
 
 
 def command(*args):
@@ -69,15 +73,24 @@ def tailscale_status():
     return description
 
 
-def sync_status():
+def syncthing_config():
     paths = (command("syncthing", "paths") or "").splitlines()
     try:
         config_path = Path(paths[paths.index("Configuration file:") + 1].strip())
-        devices = ElementTree.parse(config_path).getroot().findall("device")
+        return ElementTree.parse(config_path).getroot()
     except (OSError, ValueError, IndexError, ElementTree.ParseError):
+        return None
+
+
+def relay_device(config):
+    return next((item for item in config.findall("device")
+                 if (item.get("name") or "").casefold() == RELAY.casefold()), None)
+
+
+def sync_status(config):
+    if config is None:
         return "Local Syncthing configuration unavailable", "unknown"
-    device = next((item for item in devices
-                   if (item.get("name") or "").casefold() == RELAY.casefold()), None)
+    device = relay_device(config)
     if device is None:
         return f"{RELAY} is not configured in Syncthing", "unknown"
     data = json_command("syncthing", "cli", "show", "connections")
@@ -92,17 +105,107 @@ def sync_status():
     return f"{RELAY} disconnected in Syncthing", "degraded"
 
 
-def snapshot():
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def local_api(config):
+    gui = config.find("gui")
+    if gui is None or gui.get("enabled") == "false":
+        return None
+    key = gui.findtext("apikey")
+    address = (gui.findtext("address") or "127.0.0.1:8384").strip()
+    scheme = "https" if gui.get("tls") == "true" else "http"
+    base = f"{scheme}://{address}"
+    try:
+        url = urlsplit(base)
+        if (not key or url.hostname not in ("127.0.0.1", "::1") or not url.port
+                or url.path or url.query or url.fragment or url.username is not None):
+            return None
+    except ValueError:
+        return None
+    opener = build_opener(ProxyHandler({}), NoRedirect())
+
+    def get(endpoint, **params):
+        request = Request(f"{base}/rest/db/{endpoint}?{urlencode(params)}",
+                          headers={"X-API-Key": key})
+        try:
+            with opener.open(request, timeout=2) as response:
+                data = json.load(response)
+                return data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    return get
+
+
+def vault_status(folder, device, connected, get):
+    if folder is None:
+        return "Folder not configured"
+    if folder.findtext("paused") == "true":
+        return "Paused on this Chromebook"
+    if get is None:
+        return "Local status unavailable"
+    local = get("status", folder=folder.get("id"))
+    state = local.get("state")
+    if local.get("error") or local.get("pullErrors") or state == "error":
+        return "Sync error · Open Syncthing for details"
+    if not state:
+        return "Local status unavailable"
+    if state in ("scanning", "scan-wait", "scan-queued"):
+        return "Scanning"
+    if device is None or not any(peer.get("id") == device.get("id")
+                                 for peer in folder.findall("device")):
+        return f"Not shared with {RELAY}"
+    if device.findtext("paused") == "true":
+        return f"{RELAY} paused"
+    pending = local.get("needTotalItems")
+    if not connected:
+        return f"Waiting for {RELAY}" + (f" · {pending} local items needed" if pending else "")
+    remote = get("completion", folder=folder.get("id"), device=device.get("id"))
+    remote_state = remote.get("remoteState")
+    if remote_state == "paused":
+        return f"Paused on {RELAY}"
+    if remote_state == "notSharing":
+        return f"Not shared back by {RELAY}"
+    if state == "syncing":
+        return "Syncing on this Chromebook"
+    if pending:
+        return f"Pending · {pending} local items needed"
+    if remote_state != "valid" or pending is None:
+        return f"{RELAY} folder status unavailable"
+    if remote.get("needItems") or remote.get("needDeletes") or remote.get("needBytes"):
+        return f"Pending · {RELAY} has changes to apply"
+    if state == "idle" and remote.get("completion") == 100:
+        return f"Up to date with {RELAY}"
+    return state.replace("-", " ").capitalize()
+
+
+def vault_statuses(config, connected):
+    if config is None:
+        return ["Local status unavailable"] * len(VAULTS)
+    folders = {folder.get("label", "").casefold(): folder for folder in config.findall("folder")}
+    device = relay_device(config)
+    get = local_api(config)
+    with ThreadPoolExecutor(max_workers=len(VAULTS)) as pool:
+        return list(pool.map(lambda name: vault_status(folders.get(name.casefold()), device,
+                                                      connected, get), VAULTS))
+
+
+def snapshot(include_vaults=False):
     kind, detail, signal = local_network()
     tailscale = tailscale_status()
-    relay, state = sync_status()
+    config = syncthing_config()
+    relay, state = sync_status(config)
+    vaults = vault_statuses(config, state == "linked") if include_vaults else []
     if kind == "Offline":
         state = "offline"
-    return kind, detail, signal, tailscale, relay, state
+    return kind, detail, signal, tailscale, relay, state, vaults
 
 
 def waybar():
-    kind, detail, signal, tailscale, relay, state = snapshot()
+    kind, detail, signal, tailscale, relay, state, _ = snapshot()
     value = f"{signal}%" if signal is not None else {
         "Wired": "LAN", "Wi-Fi": "Wi-Fi", "Offline": "Off", "Unknown": "?"
     }[kind]
@@ -127,7 +230,7 @@ def launch():
         pass
 
     window = Gtk.Window(title="HoloNet Link")
-    window.set_default_size(480, 360)
+    window.set_default_size(480, 495)
     window.set_border_width(18)
     window.get_style_context().add_class("holonet-search")
     window.connect("destroy", Gtk.main_quit)
@@ -154,6 +257,20 @@ def launch():
         card.pack_start(value, False, False, 0)
         root.pack_start(card, False, False, 0)
 
+    vault_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    vault_card.get_style_context().add_class("destination")
+    vault_card.pack_start(Gtk.Label(label="ARULIA VAULTS", xalign=0), False, False, 0)
+    vault_values = []
+    for name in VAULTS:
+        row = Gtk.Box(spacing=10)
+        row.pack_start(Gtk.Label(label=f"{name} vault", xalign=0, width_chars=12),
+                       False, False, 0)
+        value = Gtk.Label(label="Checking…", xalign=0, wrap=True, selectable=True)
+        row.pack_start(value, True, True, 0)
+        vault_card.pack_start(row, False, False, 0)
+        vault_values.append(value)
+    root.pack_start(vault_card, False, False, 0)
+
     buttons = Gtk.Box(spacing=8)
     root.pack_end(buttons, False, False, 0)
     status = Gtk.Label(xalign=0)
@@ -178,10 +295,12 @@ def launch():
 
     def update(data):
         nonlocal busy
-        _, detail, signal, tailscale, relay, _ = data
+        _, detail, signal, tailscale, relay, _, vaults = data
         strength = f" · {signal}%" if signal is not None else ""
         values = (f"{detail}{strength}", tailscale, relay)
         for label, value in zip(readings, values):
+            label.set_text(value)
+        for label, value in zip(vault_values, vaults):
             label.set_text(value)
         busy = False
         refresh.set_sensitive(True)
@@ -192,7 +311,7 @@ def launch():
         if not busy:
             busy = True
             refresh.set_sensitive(False)
-            Thread(target=lambda: GLib.idle_add(update, snapshot()), daemon=True).start()
+            Thread(target=lambda: GLib.idle_add(update, snapshot(include_vaults=True)), daemon=True).start()
         return GLib.SOURCE_CONTINUE
 
     refresh.connect("clicked", poll)
