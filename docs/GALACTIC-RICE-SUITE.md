@@ -85,3 +85,14 @@ Implementation:
 Configuration backup: `~/.local/state/starwars-theme/default-terminal-20261113-001802/pre-default-terminal.tar.gz`.
 
 Verification: The isolated reversible-theme test checks the original Kitty file is restored exactly and the expected `include` is written. Fish regression checks confirm implicit Imperial defaults and explicit Sith override. An actual plain `kitty` command launched with an interactive Fish shell returned `imperial`, loaded the Galactic prompt, and exited without configuration warnings.
+
+### Waybar sector symbols and Sith Archives artwork
+
+Galactic Appearance uses an original icon font for the TIE fighter launcher
+and six workspace markers: Star Destroyer, Sith holocron, Rakatan device,
+comms dish, Imperial datacard, and Death Star. The installer copies the font
+locally. Its source is in `themes/starwars/build_sector_font.py`.
+
+Waybar uses graphite panels and thin sector accents. In Imperial Hybrid the
+focused window border matches the current sector indicator. Workspace 2 uses
+the original 16:10 Korriban corridor SVG in `themes/starwars/sith.svg`.

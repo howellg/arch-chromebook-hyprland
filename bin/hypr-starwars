@@ -283,9 +283,10 @@ def update_current(force=False):
     # that faction global, with the same rollback path.
     theme,wall=WORKSPACES.get(index,("imperial","imperial")) if chosen=="imperial" else (chosen,chosen)
     p=render(theme)
-    # Dynamic per-workspace gradients. Animation timing remains Hyprland's existing settings.
-    a=p["accent"][1:]+"ee"; b=p["edge"][1:]+"b0"
-    apply_border([a,b],p["edge"][1:]+"66",55)
+    # Match the Waybar sector indicator in Imperial Hybrid.
+    sector_accents = {2: "ed4257", 3: "64d5df", 4: "81b1da", 5: "d6af6a", 9: "ed6664"}
+    accent = sector_accents.get(index, p["accent"][1:]) if chosen == "imperial" else p["accent"][1:]
+    apply_border([accent+"ee"], "44465099", 0)
     wallpaper_apply(WALLS/(wall+".png"))
     refresh_all(waybar=force)
     (STATE/"last-workspace").write_text(f"{index} {theme} {wall}\n")
