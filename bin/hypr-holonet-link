@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""Show the Chromebook's Wi-Fi, Tailscale, and Syncthing relay status."""
+from html import escape
+import json
+from pathlib import Path
+import subprocess
+import sys
+from threading import Thread
+from xml.etree import ElementTree
+
+RELAY = "AruleWiki"
+NETWORK_MANAGER = "nm-connection-editor"
+SYNCTHING_DASHBOARD = "http://127.0.0.1:8384"
+
+
+def command(*args):
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=2.5)
+        return result.stdout.strip() if result.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def json_command(*args):
+    try:
+        return json.loads(command(*args) or "{}")
+    except ValueError:
+        return {}
+
+
+def local_network():
+    connections = command("nmcli", "-t", "--escape", "no", "-f", "TYPE,DEVICE",
+                          "connection", "show", "--active")
+    if connections is None:
+        return "Unknown", "NetworkManager unavailable", None
+    active = dict(line.split(":", 1) for line in connections.splitlines() if ":" in line)
+    if "802-3-ethernet" in active:
+        return "Wired", "Ethernet connected", None
+    if "802-11-wireless" not in active:
+        return "Offline", "No Wi-Fi or Ethernet connection", None
+    scans = command("nmcli", "-t", "--escape", "no", "-f", "IN-USE,SIGNAL,SSID",
+                    "device", "wifi", "list", "ifname", active["802-11-wireless"],
+                    "--rescan", "no")
+    for line in (scans or "").splitlines():
+        current, _, details = line.partition(":")
+        if current == "*":
+            signal, _, ssid = details.partition(":")
+            if signal.isdecimal():
+                return "Wi-Fi", ssid or "Hidden network", int(signal)
+    return "Wi-Fi", "Connected · Signal unavailable", None
+
+
+def tailscale_status():
+    data = json_command("tailscale", "status", "--json")
+    state = data.get("BackendState", "")
+    peer = next((node for node in (data.get("Peer") or {}).values()
+                 if node.get("HostName", "").casefold() == RELAY.casefold()
+                 or node.get("DNSName", "").partition(".")[0].casefold() == RELAY.casefold()), {})
+    description = {
+        "Running": "Connected", "Stopped": "Disconnected",
+        "NeedsLogin": "Sign-in required", "NeedsMachineAuth": "Device approval required",
+        "Starting": "Connecting",
+    }.get(state, state or "Unavailable")
+    if state == "Running":
+        if not peer:
+            description += f" · {RELAY} peer not found"
+        else:
+            description += f" · {RELAY} {'online' if peer.get('Online') else 'offline'}"
+    return description
+
+
+def sync_status():
+    paths = (command("syncthing", "paths") or "").splitlines()
+    try:
+        config_path = Path(paths[paths.index("Configuration file:") + 1].strip())
+        devices = ElementTree.parse(config_path).getroot().findall("device")
+    except (OSError, ValueError, IndexError, ElementTree.ParseError):
+        return "Local Syncthing configuration unavailable", "unknown"
+    device = next((item for item in devices
+                   if (item.get("name") or "").casefold() == RELAY.casefold()), None)
+    if device is None:
+        return f"{RELAY} is not configured in Syncthing", "unknown"
+    data = json_command("syncthing", "cli", "show", "connections")
+    connections = data.get("connections")
+    if connections is None:
+        return "Local Syncthing API unavailable", "unknown"
+    peer = connections.get(device.get("id"), {})
+    if peer.get("connected"):
+        return f"{RELAY} connected", "linked"
+    if device.findtext("paused") == "true":
+        return f"{RELAY} paused in Syncthing", "unknown"
+    return f"{RELAY} disconnected in Syncthing", "degraded"
+
+
+def snapshot():
+    kind, detail, signal = local_network()
+    tailscale = tailscale_status()
+    relay, state = sync_status()
+    if kind == "Offline":
+        state = "offline"
+    return kind, detail, signal, tailscale, relay, state
+
+
+def waybar():
+    kind, detail, signal, tailscale, relay, state = snapshot()
+    value = f"{signal}%" if signal is not None else {
+        "Wired": "LAN", "Wi-Fi": "Wi-Fi", "Offline": "Off", "Unknown": "?"
+    }[kind]
+    strength = f" · {signal}%" if signal is not None else ""
+    tooltip = f"HoloNet Link\n{kind} · {detail}{strength}\nTailscale · {tailscale}\nSyncthing · {relay}"
+    print(json.dumps({"text": f"\ue903  {value}", "tooltip": escape(tooltip) +
+                      "\nClick to open · Right-click for network settings", "class": state}))
+
+
+def launch():
+    import gi
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    provider = Gtk.CssProvider()
+    try:
+        provider.load_from_path(str(Path.home() / ".config/chromebook/quick-settings.css"))
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    except GLib.Error:
+        pass
+
+    window = Gtk.Window(title="HoloNet Link")
+    window.set_default_size(480, 360)
+    window.set_border_width(18)
+    window.get_style_context().add_class("holonet-search")
+    window.connect("destroy", Gtk.main_quit)
+
+    def on_key(_, event):
+        if event.keyval == Gdk.KEY_Escape:
+            window.close()
+            return True
+        return False
+
+    window.connect("key-press-event", on_key)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    window.add(root)
+    title = Gtk.Label(label="\ue903   HOLONET LINK", xalign=0)
+    title.get_style_context().add_class("heading")
+    root.pack_start(title, False, False, 0)
+    readings = []
+    for title in ("LOCAL NETWORK", "TAILSCALE", "SYNCTHING RELAY"):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        card.get_style_context().add_class("destination")
+        card.pack_start(Gtk.Label(label=title, xalign=0), False, False, 0)
+        value = Gtk.Label(label="Checking…", xalign=0, wrap=True, selectable=True)
+        readings.append(value)
+        card.pack_start(value, False, False, 0)
+        root.pack_start(card, False, False, 0)
+
+    buttons = Gtk.Box(spacing=8)
+    root.pack_end(buttons, False, False, 0)
+    status = Gtk.Label(xalign=0)
+    root.pack_end(status, False, False, 0)
+
+    def spawn(*args):
+        try:
+            subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+        except OSError:
+            status.set_text(f"Could not open {args[0]}.")
+
+    for title, args in (("Network settings", (NETWORK_MANAGER,)),
+                        ("Syncthing dashboard", ("xdg-open", SYNCTHING_DASHBOARD))):
+        button = Gtk.Button(label=title)
+        button.connect("clicked", lambda _, args=args: spawn(*args))
+        buttons.pack_start(button, False, False, 0)
+    refresh = Gtk.Button(label="Refresh")
+    buttons.pack_end(refresh, False, False, 0)
+
+    busy = False
+
+    def update(data):
+        nonlocal busy
+        _, detail, signal, tailscale, relay, _ = data
+        strength = f" · {signal}%" if signal is not None else ""
+        values = (f"{detail}{strength}", tailscale, relay)
+        for label, value in zip(readings, values):
+            label.set_text(value)
+        busy = False
+        refresh.set_sensitive(True)
+        return GLib.SOURCE_REMOVE
+
+    def poll(*_):
+        nonlocal busy
+        if not busy:
+            busy = True
+            refresh.set_sensitive(False)
+            Thread(target=lambda: GLib.idle_add(update, snapshot()), daemon=True).start()
+        return GLib.SOURCE_CONTINUE
+
+    refresh.connect("clicked", poll)
+    window.show_all()
+    poll()
+    GLib.timeout_add_seconds(15, poll)
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--waybar"]:
+        waybar()
+    else:
+        launch()

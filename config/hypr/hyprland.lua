@@ -469,6 +469,11 @@ hl.window_rule({
     float = true, center = true, size = "540 660",
 })
 hl.window_rule({
+    name = "holonet-link-panel",
+    match = { class = "^hypr-holonet-link$" },
+    float = true, center = true,
+})
+hl.window_rule({
     name = "fleet-communications-log",
     match = { class = "^hypr-notifications$" },
     float = true, center = true,

@@ -41,6 +41,18 @@ def waybar_config(original, home):
         "on-click-right": "makoctl mode -t do-not-disturb",
         "tooltip": True,
     }
+    if "network" in right:
+        right[right.index("network")] = "custom/holonet-link"
+    link = shlex.quote(str(home / ".local/bin/hypr-holonet-link"))
+    config["custom/holonet-link"] = {
+        "exec": link + " --waybar",
+        "interval": 15,
+        "return-type": "json",
+        "format": "{text}",
+        "on-click": link,
+        "on-click-right": config.get("network", {}).get("on-click", "nm-connection-editor"),
+        "tooltip": True,
+    }
     if "custom/arch" in config:
         config["custom/arch"]["format"] = "\ue900"  # TIE fighter
     workspaces = config["hyprland/workspaces"]
@@ -70,7 +82,7 @@ tooltip {{
     padding:5px;
 }}
 tooltip label {{color:{txt};}}
-#custom-arch,#workspaces,#custom-sector,#clock,#cpu,#memory,#network,
+#custom-arch,#workspaces,#custom-sector,#clock,#cpu,#memory,#custom-holonet-link,
 #pulseaudio,#backlight,#battery,#tray,#custom-power,#custom-settings,
 #custom-power-profile,#custom-comms {{
     background:linear-gradient(to bottom, #242630, #11131b);
@@ -124,7 +136,11 @@ tooltip label {{color:{txt};}}
 #clock {{ color:{txt}; font-size:11px; font-weight:800; padding:4px 11px; }}
 #cpu {{color:{txt};}}
 #memory {{color:{txt};}}
-#network {{color:{txt};}}
+#custom-holonet-link {{color:{txt};}}
+#custom-holonet-link.linked {{color:{a};}}
+#custom-holonet-link.degraded {{color:#e9bf84;}}
+#custom-holonet-link.offline,#custom-holonet-link.unknown {{color:{muted};}}
+#custom-holonet-link:hover {{background:alpha({a},.22);}}
 #pulseaudio {{color:{txt};}}
 #backlight {{color:{txt};}}
 #battery {{color:{txt};}}

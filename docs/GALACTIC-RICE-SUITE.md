@@ -135,3 +135,11 @@ acknowledge any alerts that arrived while the log was open.
 
 Right-click the dish to toggle Do Not Disturb. An amber top edge shows
 when quiet mode is active.
+
+## HoloNet Link
+
+Waybar shows the current Wi-Fi signal or wired state. Click to open the
+HoloNet Link panel for Tailscale and AruleWiki's actual Syncthing connection
+status. The panel refreshes every 15 seconds and has links to the local
+Syncthing dashboard and NetworkManager. Right-click the Waybar indicator
+to open NetworkManager directly.
