@@ -10,7 +10,6 @@ OUT.mkdir(parents=True,exist_ok=True)
 W,H=1920,1200
 SCENES={
  "imperial":("#080e18","#18243a","#ea6260","#92a3b8","IMPERIAL COMMAND","SECTOR ONE • CORUSCANT"),
- "databank":("#11121a","#292523","#d6af6a","#95abb8","IMPERIAL DATABANK","RECORDS • SECURE ACCESS"),
 }
 def shape(seed):
     rng=random.Random(seed)
@@ -73,7 +72,7 @@ def animate_comms(source):
 
 
 def main():
-    for name in (*SCENES, "sith", "bridge", "rakatan", "comms"):
+    for name in (*SCENES, "sith", "bridge", "rakatan", "comms", "databank"):
         source=ROOT/(name+".svg")
         if name in SCENES:
             source.write_text(svg(name, SCENES[name]))
