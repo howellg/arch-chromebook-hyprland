@@ -181,3 +181,11 @@ The **Top Processes** tab shows the 15 highest CPU or RAM users, with process
 names and PIDs. CPU is measured over the latest sample interval, where 100%
 is one logical core. RAM shows resident memory (RSS). The process list samples
 once a second while its tab is visible, and the Overview graphs keep updating.
+
+**Top Apps** groups windowed apps and their child processes by window class.
+Expand an app to see individual PIDs and usage. Sort by CPU or RAM, search
+by app, or freeze the list while inspecting a spike. App RAM is summed RSS,
+which can count shared memory more than once. Background tasks are available
+under Top Processes.
+Use **Inspect CPU apps** or **Inspect RAM apps** from Overview to jump straight
+to that ranking.

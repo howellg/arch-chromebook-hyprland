@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 from time import monotonic
 
 HISTORY_SECONDS = 60
@@ -114,29 +115,66 @@ def process_sample():
             continue
         fields = suffix.split()
         try:
+            parent = int(fields[1])
             ticks = int(fields[11]) + int(fields[12])
             started = int(fields[19])
             resident = max(0, int(fields[21])) * PAGE_BYTES
         except (IndexError, ValueError):
             continue
         name = prefix.partition("(")[2].replace("\n", " ").replace("\t", " ")
-        processes[(int(directory.name), started)] = (name, ticks, resident)
+        processes[(int(directory.name), started)] = (name, ticks, resident, parent)
     return processes
 
 
-def rank_processes(previous, current, elapsed, sort_by):
-    rows = []
-    for identity, (name, ticks, resident) in current.items():
+def process_usage(previous, current, elapsed):
+    rows = {}
+    for identity, (name, ticks, resident, _) in current.items():
         old = previous.get(identity)
         cpu = None
         if old is not None and elapsed > 0 and ticks >= old[1]:
             cpu = 100 * (ticks - old[1]) / (CLOCK_TICKS * elapsed)
-        rows.append((name, identity[0], cpu, resident))
-    def sort_key(row):
-        _, pid, cpu, resident = row
-        cpu = cpu if cpu is not None else -1
-        return (-resident, -cpu, pid) if sort_by == "ram" else (-cpu, -resident, pid)
-    return sorted(rows, key=sort_key)[:PROCESS_LIMIT]
+        rows[identity[0]] = (name, identity[0], cpu, resident)
+    return rows
+
+
+def usage_key(row, sort_by):
+    _, _, cpu, resident = row
+    cpu = -1 if cpu is None else cpu
+    return (resident, cpu) if sort_by == "ram" else (cpu, resident)
+
+
+def window_apps():
+    try:
+        windows = json.loads(subprocess.check_output(
+            ["hyprctl", "clients", "-j"], stderr=subprocess.DEVNULL, timeout=0.5))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+    return {window["pid"]: window.get("initialClass") or window.get("class")
+            for window in windows if window.get("mapped") and window.get("pid", 0) > 0
+            and (window.get("initialClass") or window.get("class"))}
+
+
+def grouped_apps(apps, sample, rows):
+    parents = {pid: data[3] for (pid, _), data in sample.items()}
+    groups = {}
+    for pid, row in rows.items():
+        ancestor = pid
+        visited = set()
+        while ancestor in parents and ancestor not in visited:
+            if ancestor in apps:
+                name = apps[ancestor]
+                groups.setdefault(name.casefold(), (name, []))[1].append(row)
+                break
+            visited.add(ancestor)
+            ancestor = parents[ancestor]
+
+    result = []
+    for name, members in groups.values():
+        sampled_cpu = [row[2] for row in members if row[2] is not None]
+        summary = (name, 0, sum(sampled_cpu) if sampled_cpu else None,
+                   sum(row[3] for row in members))
+        result.append((summary, members))
+    return result
 
 
 def draw_trend(area, cr, history, ceiling):
@@ -185,6 +223,7 @@ def launch():
     grid = Gtk.Grid(column_spacing=10, row_spacing=10, column_homogeneous=True, margin_top=9)
     pages.append_page(grid, Gtk.Label(label="Overview"))
     widgets = []
+    inspect_buttons = {}
 
     cards = (("CPU", 1, "0–100%"), ("RAM", 1, "0–100%"),
              ("CPU TEMPERATURE", 110, "0–110 °C"), ("BATTERY", None, ""))
@@ -211,6 +250,10 @@ def launch():
             card.pack_start(trend, True, True, 0)
             legend = Gtk.Label(label=f"Last 60 s  ·  {units}", xalign=0)
             card.pack_start(legend, False, False, 0)
+        if label in ("CPU", "RAM"):
+            inspect = Gtk.Button(label=f"Inspect {label} apps")
+            card.pack_start(inspect, False, False, 0)
+            inspect_buttons[label.lower()] = inspect
         widgets.append((value, detail, meter, trend, history))
 
     process_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=9)
@@ -223,6 +266,35 @@ def launch():
     sort.append("ram", "RAM")
     sort.set_active_id("cpu")
     toolbar.pack_start(sort, False, False, 0)
+
+    app_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=9)
+    pages.append_page(app_page, Gtk.Label(label="Top Apps"))
+    app_toolbar = Gtk.Box(spacing=8)
+    app_page.pack_start(app_toolbar, False, False, 0)
+    search = Gtk.SearchEntry()
+    search.set_placeholder_text("Find an app")
+    app_toolbar.pack_start(search, True, True, 0)
+    app_sort = Gtk.ComboBoxText()
+    app_sort.append("cpu", "Sort by CPU")
+    app_sort.append("ram", "Sort by RAM")
+    app_sort.set_active_id("cpu")
+    app_toolbar.pack_start(app_sort, False, False, 0)
+    freeze = Gtk.ToggleButton(label="Freeze list")
+    app_toolbar.pack_start(freeze, False, False, 0)
+
+    app_store = Gtk.TreeStore(str, str, str, str)
+    app_table = Gtk.TreeView(model=app_store)
+    for index, title in enumerate(("App / process", "Processes / PID", "CPU", "RAM · RSS")):
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn(title, renderer, text=index)
+        if index == 0:
+            column.set_expand(True)
+        app_table.append_column(column)
+    app_scroll = Gtk.ScrolledWindow(min_content_height=250)
+    app_scroll.add(app_table)
+    app_page.pack_start(app_scroll, True, True, 0)
+    app_status = Gtk.Label(xalign=0, wrap=True)
+    app_page.pack_start(app_status, False, False, 0)
 
     store = Gtk.ListStore(str, int, str, str)
     table = Gtk.TreeView(model=store)
@@ -244,33 +316,101 @@ def launch():
     before = None
     previous_processes = {}
     previous_time = None
-    process_rows = None
+    process_rows = {}
+    app_groups = []
+    expanded_apps = set()
+    rebuilding = False
+
+    def display_usage(cpu, resident):
+        return ("—" if cpu is None else f"{cpu:.1f}%", f"{resident / 1024**2:.1f} MiB")
 
     def render_processes(*_):
-        if process_rows is None:
-            return
         store.clear()
-        for name, pid, cpu, resident in rank_processes(*process_rows, sort.get_active_id()):
-            cpu_text = "—" if cpu is None else f"{cpu:.1f}%"
-            store.append((name, pid, cpu_text, f"{resident / 1024**2:.1f} MiB"))
+        ranked = sorted(process_rows.values(),
+                        key=lambda row: usage_key(row, sort.get_active_id()), reverse=True)
+        for name, pid, cpu, resident in ranked[:PROCESS_LIMIT]:
+            store.append((name, pid, *display_usage(cpu, resident)))
 
-    def refresh_processes():
-        nonlocal previous_processes, previous_time, process_rows
+    def render_apps(*_):
+        nonlocal rebuilding
+        query = search.get_text().strip().casefold()
+        sort_by = app_sort.get_active_id()
+        ranked = sorted(app_groups, key=lambda group: usage_key(group[0], sort_by), reverse=True)
+        adjustment = app_scroll.get_vadjustment()
+        scroll_position = adjustment.get_value()
+        rebuilding = True
+        app_store.clear()
+        count = 0
+        for (name, _, cpu, resident), members in ranked:
+            if query not in name.casefold():
+                continue
+            count += 1
+            parent = app_store.append(None, (name, str(len(members)), *display_usage(cpu, resident)))
+            for member, pid, child_cpu, child_ram in sorted(
+                    members, key=lambda row: usage_key(row, sort_by), reverse=True):
+                app_store.append(parent, (member, str(pid), *display_usage(child_cpu, child_ram)))
+            if name in expanded_apps:
+                app_table.expand_row(app_store.get_path(parent), False)
+        rebuilding = False
+        adjustment.set_value(scroll_position)
+        if count:
+            app_status.set_text(("Frozen · " if freeze.get_active() else "") +
+                                "Windowed apps and their child processes. Summed RSS can count shared memory twice.")
+        else:
+            app_status.set_text("No matching apps" if query else "No windowed apps detected")
+
+    def remember_expansion(_, row, __, expanded):
+        if not rebuilding:
+            name = app_store[row][0]
+            if expanded:
+                expanded_apps.add(name)
+            else:
+                expanded_apps.discard(name)
+
+    def refresh_processes(index):
+        nonlocal previous_processes, previous_time, process_rows, app_groups
+        if index == 2 and freeze.get_active() and app_groups:
+            return
+        apps = window_apps() if index == 2 else {}
         current = process_sample()
         now = monotonic()
         elapsed = now - previous_time if previous_time is not None else 0
-        process_rows = previous_processes, current, elapsed
+        process_rows = process_usage(previous_processes, current, elapsed)
         previous_processes, previous_time = current, now
-        render_processes()
+        if index == 2:
+            app_groups = grouped_apps(apps, current, process_rows)
+            render_apps()
+        else:
+            render_processes()
 
     def switch_page(_, __, index):
-        nonlocal previous_time, previous_processes, process_rows
-        if index == 1:
-            refresh_processes()
-        else:
-            previous_processes, previous_time, process_rows = {}, None, None
+        nonlocal previous_time, previous_processes
+        previous_processes, previous_time = {}, None
+        if index:
+            refresh_processes(index)
 
+    def toggle_freeze(button):
+        nonlocal previous_processes, previous_time
+        if not button.get_active():
+            previous_processes, previous_time = {}, None
+            refresh_processes(2)
+        else:
+            render_apps()
+
+    def inspect_apps(_, metric):
+        freeze.set_active(False)
+        search.set_text("")
+        app_sort.set_active_id(metric)
+        pages.set_current_page(2)
+
+    for metric, inspect in inspect_buttons.items():
+        inspect.connect("clicked", inspect_apps, metric)
     sort.connect("changed", render_processes)
+    search.connect("search-changed", render_apps)
+    app_sort.connect("changed", render_apps)
+    freeze.connect("toggled", toggle_freeze)
+    app_table.connect("row-expanded", remember_expansion, True)
+    app_table.connect("row-collapsed", remember_expansion, False)
     pages.connect("switch-page", switch_page)
 
     def refresh():
@@ -290,8 +430,9 @@ def launch():
                     history.popleft()
                 trend.queue_draw()
         before = after
-        if pages.get_current_page() == 1:
-            refresh_processes()
+        index = pages.get_current_page()
+        if index > 0:
+            refresh_processes(index)
         return GLib.SOURCE_CONTINUE
 
     window.show_all()
