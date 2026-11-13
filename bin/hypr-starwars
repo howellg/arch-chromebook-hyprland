@@ -173,6 +173,18 @@ def lock_legacy(p):
     return b.replace("# Catppuccin Mocha lock screen",f"# {p['label']} lock screen")
 def hexrgb(color):
     return "rgb("+", ".join(str(int(color[i:i+2],16)) for i in (1,3,5))+")"
+def default_kitty_theme():
+    """Keep the regular Kitty profile consistent with the selected global theme.
+
+    Imperial hybrid retains Imperial as the default even on Sith/Rakatan sectors;
+    explicit 'galactic sith' and 'galactic rakatan' remain independent.
+    """
+    try:
+        chosen=SELECTION.read_text().strip()
+    except OSError:
+        chosen="imperial"
+    return chosen if chosen in THEMES else "imperial"
+
 def render(theme):
     p=THEMES[theme]
     for key,text in {
@@ -181,7 +193,10 @@ def render(theme):
         "launcher":css_wofi(p,"launcher"),
         "power":css_wofi(p,"power"),"cheatsheet":css_wofi(p,"cheatsheet"),
         "quick":galactic_quick(p),"mako":mako(p),
-        "kitty":base("kitty")+f"\n# Star Wars theme: {p['label']}\ncursor {p['accent']}\nactive_border_color {p['accent']}\n",
+        # Theme the actual 'kitty' command too, not only galactic launchers.
+        # Use the global selection, not the workspace accent: the watcher can
+        # change workspace without changing the default terminal identity.
+        "kitty":base("kitty")+f"\n# Galactic default Kitty (reversible via Catppuccin)\ninclude galactic-{default_kitty_theme()}.conf\n",
         "lock":galactic_lock(p)}.items():atomic_write(path(key),text)
     return p
 def awww_ready():

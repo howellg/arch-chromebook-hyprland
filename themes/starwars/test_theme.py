@@ -11,6 +11,7 @@ with tempfile.TemporaryDirectory(prefix="starwars-theme-isolated-") as dirname:
       "waybar/config.jsonc":'{"modules-left":["custom/arch","hyprland/workspaces","hyprland/window"],"hyprland/workspaces":{"format-icons":{}}}\n',
       "wofi/launcher.css":"* { color: #cdd6f4; }\n",
       "mako/config":"font=JetBrainsMono Nerd Font 11\n",
+      "kitty/kitty.conf":"# original kitty\n",
       "hypr/hyprpaper.conf":"wallpaper {\n monitor =\n path = /not/here\n fit_mode = cover\n}\n"
     }
     for name,contents in originals.items():
@@ -30,7 +31,9 @@ with tempfile.TemporaryDirectory(prefix="starwars-theme-isolated-") as dirname:
     assert "STAR WARS" in (config/"waybar/style.css").read_text()
     assert "IMPERIAL COMMAND" in (config/"wofi/launcher.css").read_text()
     assert (config/"wofi/power.css").is_file()
+    assert "include galactic-imperial.conf" in (config/"kitty/kitty.conf").read_text()
     invoke("set","sith")
+    assert "include galactic-sith.conf" in (config/"kitty/kitty.conf").read_text()
     assert "SITH ARCHIVES" in (config/"wofi/launcher.css").read_text() or "IMPERIAL COMMAND" in (config/"wofi/launcher.css").read_text()
     invoke("restore")
     for name,original in originals.items():

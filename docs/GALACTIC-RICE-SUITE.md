@@ -69,3 +69,19 @@ The earlier terminal combination was visually cluttered: a faction banner **plus
 `python3 themes/starwars/test_terminal_refresh.py` verifies startup width, faction colors, Kitty config startup, error-status display, default Fish isolation, and profile auto-selection. The existing `test_galactic_suite.py` and `test_theme.py` also pass.
 
 Live configuration was backed up before edits at `~/.local/state/starwars-theme/terminal-refresh-20261112-235847/config-backup.tar.gz`. The original Catppuccin desktop style remains available through `Super+Shift+Y`; ordinary Fish is unchanged even when the desktop uses Star Wars. To restore just the previous terminal presets, extract that backup into your home directory, and remove the optional `galactic_terminal.fish` file if desired. Avoid overwriting later changes without reviewing the archive.
+
+## Default Kitty appearance (November 13, 2026)
+
+The regular `kitty` command now opens with the **Imperial Command** terminal design while Imperial Hybrid is selected. This includes the familiar **Super+Q** binding, auto-started Kitty, application-menu Kitty, and tools that launch Kitty directly. Existing Hyprland shortcuts and class-based workspace rules are unchanged: ordinary Kitty stays assigned to workspace 2.
+
+Implementation:
+- `hypr-starwars` now writes an `include galactic-imperial.conf` line to the regular `~/.config/kitty/kitty.conf` (or `galactic-sith.conf` / `galactic-rakatan.conf` when that faction is selected globally). The included profile supplies colors, font, padding, and cursor.
+- Only interactive Fish inside Kitty uses `STARWARS_TERMINAL_PROFILE` automatically, and only while an actual Star Wars theme is selected. This loads the compact mission panel and Galactic prompt instead of auto-Fastfetch.
+- Explicit `galactic sith`, `galactic rakatan`, and `galactic imperial` windows take precedence over the global default.
+- Restoring Catppuccin removes the include by restoring the original Kitty configuration and suppresses implicit Fish theming. Other terminal emulators, scripts, and ordinary non-Kitty Fish remain unchanged.
+- On switching to the Sith or Rakatan **global** desktop style, newly opened default Kitty windows follow the selected global style. Imperial Hybrid deliberately defaults to Imperial regardless of workspace accent.
+- Existing terminal windows retain their current appearance until reopened. `fastfetch` / `galactic info` remain available for the full hardware report.
+
+Configuration backup: `~/.local/state/starwars-theme/default-terminal-20261113-001802/pre-default-terminal.tar.gz`.
+
+Verification: The isolated reversible-theme test checks the original Kitty file is restored exactly and the expected `include` is written. Fish regression checks confirm implicit Imperial defaults and explicit Sith override. An actual plain `kitty` command launched with an interactive Fish shell returned `imperial`, loaded the Galactic prompt, and exited without configuration warnings.

@@ -36,6 +36,17 @@ code,out=run(["fish","-c","functions --details fish_prompt; functions --details 
 assert code==0 and "fish_prompt.fish" in out and "fish_greeting.fish" in out,out
 assert "galactic_terminal.fish" not in out
 print("PASS: ordinary Fish prompt and fastfetch greeting unchanged")
+# A plain Kitty window is no longer plain under Imperial hybrid:
+# it picks the selected global profile without needing a special launcher.
+kitty_env={**plain,"KITTY_WINDOW_ID":"98241"}
+code,out=run(["fish","-ic","printf 'PROFILE:%s\\n' $STARWARS_TERMINAL_PROFILE; functions --details fish_prompt"],kitty_env)
+assert code==0 and "PROFILE:imperial" in out and "galactic_terminal.fish" in out,out
+print("PASS: generic Kitty inherits Imperial greeting and prompt")
+# Explicit launchers must override that default when present.
+sith_env={**kitty_env,"STARWARS_TERMINAL_PROFILE":"sith"}
+code,out=run(["fish","-ic","printf 'PROFILE:%s\\n' $STARWARS_TERMINAL_PROFILE"],sith_env)
+assert code==0 and "PROFILE:sith" in out,out
+print("PASS: explicit Sith profile takes precedence")
 for profile in ("auto","sith","rakatan","imperial"):
     code,out=run([sys.executable,str(BIN/"hypr-galactic-terminal"),profile,"--print"])
     assert code==0 and "--class galactic-" in out and "/usr/bin/fish" in out,(profile,out)

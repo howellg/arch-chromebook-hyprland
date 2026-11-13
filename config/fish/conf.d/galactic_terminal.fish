@@ -1,5 +1,16 @@
-# Optional, session-local Galactic presentation. Normal Fish stays unchanged.
-# Only Kitty windows launched with STARWARS_TERMINAL_PROFILE load these overrides.
+# Galactic appearance in Kitty. Explicit Sith/Rakatan launchers take priority.
+# The ordinary 'kitty' command inherits the selected global Star Wars scheme.
+# Non-Kitty Fish, SSH and Catppuccin retain their existing prompt/greeting.
+if status is-interactive; and set -q KITTY_WINDOW_ID; and not set -q STARWARS_TERMINAL_PROFILE
+    set -l theme_file $HOME/.local/state/starwars-theme/selection
+    if test -f $theme_file
+        set -l choice (string trim -- (cat $theme_file))
+        switch $choice
+            case imperial sith rakatan
+                set -gx STARWARS_TERMINAL_PROFILE $choice
+        end
+    end
+end
 if status is-interactive; and set -q STARWARS_TERMINAL_PROFILE
     function fish_greeting --description 'Compact Galactic systems check'
         $HOME/.local/bin/hypr-galactic-greeting

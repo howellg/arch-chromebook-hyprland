@@ -188,3 +188,5 @@ The Star Wars manager saves and restores the *original Waybar layout* as well as
 ### Compact Sith / Rakatan / Imperial terminals
 
 The themed Kitty terminals now use five-line mission-status introductions and matching two-line Fish prompts, instead of displaying a giant `fastfetch` on every launch. Syntax colors, fonts, padding and tab accents match the faction, while regular Fish and Kitty greetings remain unchanged. Use `galactic here` to open the current workspace's theme, `galactic sith`/`galactic rakatan`/`galactic imperial` to pick one, or `galactic info` for the original full fastfetch report. See the [terminal refresh notes](docs/GALACTIC-RICE-SUITE.md#refined-galactic-terminals-november-2026).
+
+**Default terminal:** With Imperial Hybrid active, every ordinary `kitty` launch (including Super+Q) now uses the Imperial command-console colors and compact Fish greeting automatically; explicitly launched Sith/Rakatan consoles still keep their own designs. Catppuccin restores the original Kitty config. See [default terminal setup](docs/GALACTIC-RICE-SUITE.md#default-kitty-appearance-november-13-2026).
