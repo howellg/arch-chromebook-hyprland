@@ -2,7 +2,7 @@
 """Original cinematic Star Wars-inspired wallpapers (Episodes I-VI / Legends motifs)."""
 from pathlib import Path
 from math import sin,cos,pi
-import random,subprocess,sys
+import random,shutil,subprocess,tempfile
 
 ROOT=Path(__file__).resolve().parent
 OUT=Path.home()/".local/share/starwars-theme/wallpapers"
@@ -11,7 +11,6 @@ W,H=1920,1200
 SCENES={
  "imperial":("#080e18","#18243a","#ea6260","#92a3b8","IMPERIAL COMMAND","SECTOR ONE • CORUSCANT"),
  "databank":("#11121a","#292523","#d6af6a","#95abb8","IMPERIAL DATABANK","RECORDS • SECURE ACCESS"),
- "comms":("#0b1524","#223146","#8ab9d2","#d3a47b","FLEET COMMUNICATIONS","HOLO-NET • ONLINE"),
 }
 def shape(seed):
     rng=random.Random(seed)
@@ -45,12 +44,44 @@ def svg(name,palette):
 <text x="150" y="1132" font-size="19" letter-spacing="3" opacity=".8">SYSTEM STATUS: OPERATIONAL</text>
 <text x="1460" y="1132" font-size="16" letter-spacing="3" fill="{accent}">SECURE TERMINAL</text></g>
 <g fill="{accent}" opacity=".48"><rect x="150" y="625" width="440" height="3"/>{bars}</g></svg>'''
+def animate_comms(source):
+    dest = OUT / "comms.gif"
+    if not shutil.which("ffmpeg"):
+        dest.unlink(missing_ok=True)
+        return
+    original = source.read_text()
+    with tempfile.TemporaryDirectory(prefix="comms-frames-") as work:
+        frames = Path(work)
+        for index in range(36):
+            phase = 2 * pi * index / 36
+            traffic = f"{1165 + 42 * sin(phase):.2f} {303 + 8 * sin(phase):.2f}"
+            patrol = f"{1590 + 30 * sin(phase + 1):.2f} {239 - 6 * sin(phase + 1):.2f}"
+            svg = original.replace("translate(1165 303)", f"translate({traffic})").replace(
+                "translate(1590 239)", f"translate({patrol})")
+            subprocess.run(["rsvg-convert", "--width", "1280", "--height", "800",
+                            "--output", str(frames / f"{index:02}.png")],
+                           input=svg.encode(), check=True)
+        animation = OUT / ".comms-building.gif"
+        try:
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", "4",
+                            "-i", str(frames / "%02d.png"), "-lavfi",
+                            "split[a][b];[a]palettegen[p];[b][p]paletteuse=dither=bayer",
+                            "-loop", "0", str(animation)], check=True)
+            animation.replace(dest)
+        finally:
+            animation.unlink(missing_ok=True)
+
+
 def main():
-    for name in (*SCENES, "sith", "bridge", "rakatan"):
+    for name in (*SCENES, "sith", "bridge", "rakatan", "comms"):
         source=ROOT/(name+".svg")
         if name in SCENES:
             source.write_text(svg(name, SCENES[name]))
         dest=OUT/(name+".png")
         subprocess.run(["rsvg-convert","--width",str(W),"--height",str(H),"--output",str(dest),str(source)],check=True)
         print(name,dest)
+    try:
+        animate_comms(ROOT / "comms.svg")
+    except subprocess.CalledProcessError as error:
+        print(f"Communications deck animation unavailable: {error}; using the still wallpaper.")
 if __name__=="__main__":main()

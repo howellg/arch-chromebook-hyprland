@@ -458,7 +458,7 @@ for _, profile in ipairs({
         workspace = profile.target,
     })
 end
-for _, class in ipairs({ "hypr-command-power", "hypr-command-monitor", "hypr-overview-grid", "hypr-imperial-capture" }) do
+for _, class in ipairs({ "hypr-command-power", "hypr-command-monitor", "hypr-datacards", "hypr-overview-grid", "hypr-imperial-capture" }) do
     hl.window_rule({
         name = class .. "-panel",
         match = { class = "^" .. class .. "$" },
