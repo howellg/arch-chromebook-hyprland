@@ -176,3 +176,8 @@ Click the Command Bridge button in Galactic Waybar to open the system monitor.
 The panel updates CPU use, memory, CPU temperature, and battery charge and state
 once a second. CPU, RAM, and temperature show a rolling 60-second graph that
 fills while the panel is open. Press Esc to dismiss it.
+
+The **Top Processes** tab shows the 15 highest CPU or RAM users, with process
+names and PIDs. CPU is measured over the latest sample interval, where 100%
+is one logical core. RAM shows resident memory (RSS). The process list samples
+once a second while its tab is visible, and the Overview graphs keep updating.

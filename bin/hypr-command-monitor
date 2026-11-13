@@ -3,11 +3,15 @@
 from collections import deque
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import sys
 from time import monotonic
 
 HISTORY_SECONDS = 60
+PROCESS_LIMIT = 15
+CLOCK_TICKS = os.sysconf("SC_CLK_TCK")
+PAGE_BYTES = os.sysconf("SC_PAGE_SIZE")
 
 
 @dataclass(frozen=True)
@@ -99,6 +103,42 @@ def readings(before, after):
     return (cpu_reading(before, after), memory_reading(), temperature_reading(), battery_reading())
 
 
+def process_sample():
+    processes = {}
+    for directory in Path("/proc").iterdir():
+        if not directory.name.isdecimal():
+            continue
+        stat = read(directory / "stat")
+        prefix, separator, suffix = stat.rpartition(")")
+        if not separator:
+            continue
+        fields = suffix.split()
+        try:
+            ticks = int(fields[11]) + int(fields[12])
+            started = int(fields[19])
+            resident = max(0, int(fields[21])) * PAGE_BYTES
+        except (IndexError, ValueError):
+            continue
+        name = prefix.partition("(")[2].replace("\n", " ").replace("\t", " ")
+        processes[(int(directory.name), started)] = (name, ticks, resident)
+    return processes
+
+
+def rank_processes(previous, current, elapsed, sort_by):
+    rows = []
+    for identity, (name, ticks, resident) in current.items():
+        old = previous.get(identity)
+        cpu = None
+        if old is not None and elapsed > 0 and ticks >= old[1]:
+            cpu = 100 * (ticks - old[1]) / (CLOCK_TICKS * elapsed)
+        rows.append((name, identity[0], cpu, resident))
+    def sort_key(row):
+        _, pid, cpu, resident = row
+        cpu = cpu if cpu is not None else -1
+        return (-resident, -cpu, pid) if sort_by == "ram" else (-cpu, -resident, pid)
+    return sorted(rows, key=sort_key)[:PROCESS_LIMIT]
+
+
 def draw_trend(area, cr, history, ceiling):
     width = area.get_allocated_width() - 2
     height = area.get_allocated_height() - 2
@@ -140,8 +180,10 @@ def launch():
     root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
     window.add(root)
     root.pack_start(heading("\ue906   COMMAND BRIDGE / SYSTEM MONITOR"), False, False, 0)
-    grid = Gtk.Grid(column_spacing=10, row_spacing=10, column_homogeneous=True)
-    root.pack_start(grid, True, True, 0)
+    pages = Gtk.Notebook()
+    root.pack_start(pages, True, True, 0)
+    grid = Gtk.Grid(column_spacing=10, row_spacing=10, column_homogeneous=True, margin_top=9)
+    pages.append_page(grid, Gtk.Label(label="Overview"))
     widgets = []
 
     cards = (("CPU", 1, "0–100%"), ("RAM", 1, "0–100%"),
@@ -171,7 +213,65 @@ def launch():
             card.pack_start(legend, False, False, 0)
         widgets.append((value, detail, meter, trend, history))
 
+    process_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=9)
+    pages.append_page(process_page, Gtk.Label(label="Top Processes"))
+    toolbar = Gtk.Box(spacing=8)
+    process_page.pack_start(toolbar, False, False, 0)
+    toolbar.pack_start(Gtk.Label(label="Sort by"), False, False, 0)
+    sort = Gtk.ComboBoxText()
+    sort.append("cpu", "CPU")
+    sort.append("ram", "RAM")
+    sort.set_active_id("cpu")
+    toolbar.pack_start(sort, False, False, 0)
+
+    store = Gtk.ListStore(str, int, str, str)
+    table = Gtk.TreeView(model=store)
+    for index, title in enumerate(("Process", "PID", "CPU", "RAM · RSS")):
+        renderer = Gtk.CellRendererText()
+        if index:
+            renderer.set_property("xalign", 1)
+        column = Gtk.TreeViewColumn(title, renderer, text=index)
+        if index == 0:
+            column.set_expand(True)
+        table.append_column(column)
+    scroll = Gtk.ScrolledWindow(min_content_height=250)
+    scroll.add(table)
+    process_page.pack_start(scroll, True, True, 0)
+    detail = Gtk.Label(label="CPU is relative to one logical core. RSS includes shared memory.",
+                       xalign=0, wrap=True)
+    process_page.pack_start(detail, False, False, 0)
+
     before = None
+    previous_processes = {}
+    previous_time = None
+    process_rows = None
+
+    def render_processes(*_):
+        if process_rows is None:
+            return
+        store.clear()
+        for name, pid, cpu, resident in rank_processes(*process_rows, sort.get_active_id()):
+            cpu_text = "—" if cpu is None else f"{cpu:.1f}%"
+            store.append((name, pid, cpu_text, f"{resident / 1024**2:.1f} MiB"))
+
+    def refresh_processes():
+        nonlocal previous_processes, previous_time, process_rows
+        current = process_sample()
+        now = monotonic()
+        elapsed = now - previous_time if previous_time is not None else 0
+        process_rows = previous_processes, current, elapsed
+        previous_processes, previous_time = current, now
+        render_processes()
+
+    def switch_page(_, __, index):
+        nonlocal previous_time, previous_processes, process_rows
+        if index == 1:
+            refresh_processes()
+        else:
+            previous_processes, previous_time, process_rows = {}, None, None
+
+    sort.connect("changed", render_processes)
+    pages.connect("switch-page", switch_page)
 
     def refresh():
         nonlocal before
@@ -190,6 +290,8 @@ def launch():
                     history.popleft()
                 trend.queue_draw()
         before = after
+        if pages.get_current_page() == 1:
+            refresh_processes()
         return GLib.SOURCE_CONTINUE
 
     window.show_all()
