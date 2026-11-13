@@ -12,12 +12,14 @@ original=json.loads((root/"config/waybar/config.jsonc").read_text())
 configured=json.loads(waybar_config(json.dumps(original),Path("/home/testing")))
 assert "custom/sector" in configured["modules-left"]
 assert "hyprland/window" not in configured["modules-left"]
-for module in ("network","cpu","memory","pulseaudio","backlight","battery",
+for module in ("custom/holonet-link","cpu","memory","pulseaudio","backlight","battery",
                "custom/settings","custom/power-profile","tray","custom/power"):
     assert module in configured["modules-right"],module
 assert configured["custom/sector"]["tail"] is True
 assert configured["hyprland/workspaces"]["on-click"] == original["hyprland/workspaces"]["on-click"]
-print("PASS: sector module + all original Waybar controls")
+assert "network" not in configured["modules-right"]
+assert configured["custom/holonet-link"]["on-click-right"] == original["network"]["on-click"]
+print("PASS: sector and HoloNet modules + original Waybar controls")
 try:
     import gi
     gi.require_version("Gtk","3.0")
