@@ -3,11 +3,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from html import escape
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 from threading import Thread
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from xml.etree import ElementTree
 
@@ -182,15 +183,33 @@ def vault_status(folder, device, connected, get):
     return state.replace("-", " ").capitalize()
 
 
+def obsidian_vaults():
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    try:
+        data = json.loads((config_home / "obsidian/obsidian.json").read_text())
+        return {Path(item["path"]).resolve(): id_ for id_, item in data["vaults"].items()
+                if item.get("path")}
+    except (OSError, ValueError, KeyError, RuntimeError):
+        return {}
+
+
 def vault_statuses(config, connected):
     if config is None:
-        return ["Local status unavailable"] * len(VAULTS)
+        return [("Local status unavailable", None)] * len(VAULTS)
     folders = {folder.get("label", "").casefold(): folder for folder in config.findall("folder")}
     device = relay_device(config)
     get = local_api(config)
+    registered = obsidian_vaults()
+
+    def reading(name):
+        folder = folders.get(name.casefold())
+        status = vault_status(folder, device, connected, get)
+        path = folder.get("path") if folder is not None else None
+        vault_id = registered.get(Path(path).expanduser().resolve()) if path else None
+        return status, vault_id
+
     with ThreadPoolExecutor(max_workers=len(VAULTS)) as pool:
-        return list(pool.map(lambda name: vault_status(folders.get(name.casefold()), device,
-                                                      connected, get), VAULTS))
+        return list(pool.map(reading, VAULTS))
 
 
 def snapshot(include_vaults=False):
@@ -230,7 +249,7 @@ def launch():
         pass
 
     window = Gtk.Window(title="HoloNet Link")
-    window.set_default_size(480, 495)
+    window.set_default_size(560, 520)
     window.set_border_width(18)
     window.get_style_context().add_class("holonet-search")
     window.connect("destroy", Gtk.main_quit)
@@ -260,15 +279,19 @@ def launch():
     vault_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     vault_card.get_style_context().add_class("destination")
     vault_card.pack_start(Gtk.Label(label="ARULIA VAULTS", xalign=0), False, False, 0)
-    vault_values = []
+    vault_controls = []
     for name in VAULTS:
         row = Gtk.Box(spacing=10)
         row.pack_start(Gtk.Label(label=f"{name} vault", xalign=0, width_chars=12),
                        False, False, 0)
         value = Gtk.Label(label="Checking…", xalign=0, wrap=True, selectable=True)
         row.pack_start(value, True, True, 0)
+        open_button = Gtk.Button(label="Open in Obsidian", sensitive=False)
+        open_button.set_tooltip_text(f"Open the {name} vault in Obsidian")
+        open_button.connect("clicked", lambda button: open_vault(button.vault_id))
+        row.pack_end(open_button, False, False, 0)
         vault_card.pack_start(row, False, False, 0)
-        vault_values.append(value)
+        vault_controls.append((value, open_button))
     root.pack_start(vault_card, False, False, 0)
 
     buttons = Gtk.Box(spacing=8)
@@ -282,6 +305,9 @@ def launch():
                              start_new_session=True)
         except OSError:
             status.set_text(f"Could not open {args[0]}.")
+
+    def open_vault(vault_id):
+        spawn("xdg-open", "obsidian://open?" + urlencode({"vault": vault_id}, quote_via=quote))
 
     for title, args in (("Network settings", (NETWORK_MANAGER,)),
                         ("Syncthing dashboard", ("xdg-open", SYNCTHING_DASHBOARD))):
@@ -300,8 +326,14 @@ def launch():
         values = (f"{detail}{strength}", tailscale, relay)
         for label, value in zip(readings, values):
             label.set_text(value)
-        for label, value in zip(vault_values, vaults):
+        for (label, button), (value, vault_id) in zip(vault_controls, vaults):
             label.set_text(value)
+            button.vault_id = vault_id
+            button.set_sensitive(bool(vault_id))
+            if not vault_id:
+                button.set_tooltip_text("Register this synced folder as a vault in Obsidian")
+            else:
+                button.set_tooltip_text("Open this vault in Obsidian")
         busy = False
         refresh.set_sensitive(True)
         return GLib.SOURCE_REMOVE

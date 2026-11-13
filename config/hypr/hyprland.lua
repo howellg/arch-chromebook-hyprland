@@ -493,6 +493,11 @@ hl.window_rule({
     match = { class = "^(discord|Discord)$" },
     workspace = "4",
 })
+hl.window_rule({
+    name = "obsidian-workspace-5",
+    match = { class = "^(obsidian|Obsidian|md[.]obsidian[.]Obsidian)$" },
+    workspace = "5",
+})
 -- Keep utility windows floating, centered and comfortably sized.
 hl.window_rule({
     name = "float-small-utilities",

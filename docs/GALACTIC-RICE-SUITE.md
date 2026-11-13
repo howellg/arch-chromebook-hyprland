@@ -148,3 +148,6 @@ The Arulia Vaults card shows the DM and Player Syncthing folders, including
 scanning, pending changes, pause, errors, and completion with AruleWiki.
 Folder checks run while the panel is open. They read the local Syncthing
 API on loopback and leave the vaults and Syncthing settings untouched.
+
+Use **Open in Obsidian** beside either vault to open its registered Syncthing
+folder. Obsidian opens on Workspace 5, Imperial Databank, by default.
