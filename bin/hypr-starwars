@@ -197,7 +197,7 @@ def render(theme):
         # Use the global selection, not the workspace accent: the watcher can
         # change workspace without changing the default terminal identity.
         "kitty":base("kitty")+f"\n# Galactic default Kitty (reversible via Catppuccin)\ninclude galactic-{default_kitty_theme()}.conf\n",
-        "lock":galactic_lock(p)}.items():atomic_write(path(key),text)
+        "lock":galactic_lock(p, WALLS/"bridge.png" if theme == "imperial" else None)}.items():atomic_write(path(key),text)
     return p
 def awww_ready():
     """Start the Arch-packaged user-level wallpaper daemon if available."""
