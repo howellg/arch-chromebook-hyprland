@@ -1,5 +1,8 @@
 extends Node3D
 
+const Hyperspace := preload("res://scripts/hyperspace.gd")
+const JUMP_SECONDS := 0.32
+
 # Real 3D workspace selector. This process only lives while the picker is open.
 # Hyprland is queried locally; no shell text from the UI is executed.
 var world: VaultWorld
@@ -9,6 +12,7 @@ var active_workspace: int = 1
 var records: Dictionary = {}
 var mode: String = "vault"
 var closed: bool = false
+var jumping: bool = false
 var target_look: Vector3 = Vector3(3.65, 1.35, 0)
 var refresh_timer: Timer
 var self_test: bool = false
@@ -33,7 +37,7 @@ func _ready() -> void:
     hud.close_requested.connect(_close)
 
     active_workspace = HyprBridge.get_current()
-    focus_id = active_workspace
+    focus_id = active_workspace if active_workspace in HyprBridge.WORKSPACES else HyprBridge.WORKSPACES[0]
     _fetch_data()
 
     refresh_timer = Timer.new()
@@ -72,39 +76,60 @@ func _capture_preview() -> void:
     get_tree().quit()
 
 func _fetch_data() -> void:
-    if closed:
+    if closed or jumping:
         return
     records = HyprBridge.snapshot()
     world.update_occupancy(records)
     hud.display(focus_id, mode, records, active_workspace)
 
 func _select(id: int) -> void:
-    if id in HyprBridge.WORKSPACES:
+    if not jumping and id in HyprBridge.WORKSPACES:
         focus_id = id
         hud.display(focus_id, mode, records, active_workspace)
 
 func _set_mode(next_mode: String) -> void:
-    if not next_mode in ["vault", "map", "table"]:
+    if jumping or not next_mode in ["vault", "map", "table"]:
         return
     mode = next_mode
     world.set_mode(mode)
     hud.display(focus_id, mode, records, active_workspace)
 
 func _activate(id: int) -> void:
-    if self_test or closed:
+    if self_test or closed or jumping or not id in HyprBridge.WORKSPACES:
         return
-    if not id in HyprBridge.WORKSPACES:
-        return
-    closed = true
+    jumping = true
+    var travel: bool = id != active_workspace
+    var layer: CanvasLayer
+    if travel and "--no-hyperspace" not in OS.get_cmdline_user_args() and HyprBridge.animations_enabled():
+        layer = CanvasLayer.new()
+        layer.layer = 20
+        add_child(layer)
+        var effect := Hyperspace.new()
+        effect.destination = "%02d  /  %s" % [id, HyprBridge.NAMES[id]]
+        effect.accent = HyprBridge.TINTS[id]
+        layer.add_child(effect)
+        effect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        var tween := create_tween()
+        tween.tween_method(effect.advance, 0.0, 1.0, JUMP_SECONDS)
+        await tween.finished
+        if closed:
+            return
+
     # Keep current focus when Hyprland is unavailable instead of guessing.
     var switched: bool = HyprBridge.switch_to(id)
     if switched:
         HyprBridge.remember(id)
-        if id != active_workspace:
-            OS.create_process(OS.get_environment("HOME").path_join(".local/bin/hypr-galactic-cue"), ["workspace"])
+        if travel:
+            var cue := OS.get_environment("HOME").path_join(".local/bin/hypr-galactic-cue")
+            if FileAccess.file_exists(cue):
+                OS.create_process(cue, ["workspace"])
+        _close()
     else:
+        if is_instance_valid(layer):
+            layer.queue_free()
+        jumping = false
+        hud.status_label.text = "WORKSPACE SWITCH FAILED"
         push_warning("Hyprland refused workspace switch: %d" % id)
-    get_tree().quit()
 
 func _close() -> void:
     if closed:
@@ -113,7 +138,7 @@ func _close() -> void:
     get_tree().quit()
 
 func _process(delta: float) -> void:
-    if world == null:
+    if world == null or jumping:
         return
     world.update_scene(delta, focus_id)
     var base_camera: Vector3
