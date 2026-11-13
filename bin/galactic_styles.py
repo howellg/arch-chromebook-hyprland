@@ -1,5 +1,6 @@
 """Cinematic but lightweight Star Wars UI skins. No persistent state or external commands."""
 import json
+import shlex
 from pathlib import Path
 
 SECTORS={
@@ -25,6 +26,20 @@ def waybar_config(original, home):
         "format":"{text}","tooltip":True,
         "on-click":str(home/".local/bin/hypr-starwars-menu"),
         "on-click-right":str(home/".local/bin/hypr-holonet-launcher")
+    }
+    right = config.setdefault("modules-right", [])
+    if "custom/comms" not in right:
+        index = right.index("custom/settings") if "custom/settings" in right else len(right)
+        right.insert(index, "custom/comms")
+    log = shlex.quote(str(home / ".local/bin/hypr-notifications"))
+    config["custom/comms"] = {
+        "exec": log + " --waybar",
+        "return-type": "json",
+        "interval": 3,
+        "format": "{text}",
+        "on-click": log,
+        "on-click-right": "makoctl mode -t do-not-disturb",
+        "tooltip": True,
     }
     if "custom/arch" in config:
         config["custom/arch"]["format"] = "\ue900"  # TIE fighter
@@ -57,7 +72,7 @@ tooltip {{
 tooltip label {{color:{txt};}}
 #custom-arch,#workspaces,#custom-sector,#clock,#cpu,#memory,#network,
 #pulseaudio,#backlight,#battery,#tray,#custom-power,#custom-settings,
-#custom-power-profile {{
+#custom-power-profile,#custom-comms {{
     background:linear-gradient(to bottom, #242630, #11131b);
     border:1px solid #3b3e4a;
     border-bottom:1px solid alpha({a},.68);
@@ -120,8 +135,17 @@ tooltip label {{color:{txt};}}
 #custom-settings {{color:{a}; font-size:15px;}}
 #custom-power {{color:#ec626c; font-size:16px; padding:2px 9px;}}
 #custom-power-profile {{color:{a};}}
+#custom-comms {{color:{muted}; padding:4px 8px;}}
+#custom-comms.quiet {{border-top-color:#d6af6a;}}
+#custom-comms.unread {{color:{a};}}
+#custom-comms.priority {{
+    color:#ff9ba2; border-color:#f36e7c;
+    background:#3a202d; box-shadow:inset 0 -2px #ff6776;
+}}
+#custom-comms.priority.quiet {{border-top-color:#d6af6a;}}
+#custom-comms.offline {{opacity:.6;}}
 #custom-arch:hover,#custom-settings:hover,#custom-power:hover,
-#custom-sector:hover,#custom-power-profile:hover {{
+#custom-sector:hover,#custom-power-profile:hover,#custom-comms:hover {{
     background:alpha({a},.22);
 }}
 """
