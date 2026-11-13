@@ -16,6 +16,10 @@ STATE=HOME/".local/state/starwars-theme"
 ORIG=STATE/"catppuccin-original"
 SELECTION=STATE/"selection"
 WALLS=HOME/".local/share/starwars-theme/wallpapers"
+AWWW=("/usr/bin/awww" if Path("/usr/bin/awww").is_file() else
+      str(HOME/".local/bin/awww") if (HOME/".local/bin/awww").is_file() else shutil.which("awww"))
+AWWW_DAEMON=("/usr/bin/awww-daemon" if Path("/usr/bin/awww-daemon").is_file() else
+             str(HOME/".local/bin/awww-daemon") if (HOME/".local/bin/awww-daemon").is_file() else shutil.which("awww-daemon"))
 FILES={
     "waybar":"~/.config/waybar/style.css",
     "launcher":"~/.config/wofi/launcher.css",
@@ -75,7 +79,7 @@ def restore():
     if wallpaper:
         import re
         m=re.search(r"^\s*path\s*=\s*(.*)$",wallpaper,re.M)
-        if m and Path(m.group(1)).is_file():wallpaper_apply(Path(m.group(1)))
+        if m and Path(m.group(1)).is_file():restore_original_wallpaper(Path(m.group(1)))
     print("Restored original Catppuccin files. Shortcuts and workspace rules untouched.")
 
 def css_waybar(p):
@@ -174,19 +178,66 @@ def render(theme):
         "kitty":base("kitty")+f"\n# Star Wars theme: {p['label']}\ncursor {p['accent']}\nactive_border_color {p['accent']}\n",
         "lock":lock(p)}.items():atomic_write(path(key),text)
     return p
-def wallpaper_apply(file):
-    if not file.is_file():return
-    if run("pgrep","-x","hyprpaper")[0]!=0:
-        sp.Popen(["hyprpaper"],stdout=sp.DEVNULL,stderr=sp.DEVNULL,start_new_session=True)
-        time.sleep(.6)
+def awww_ready():
+    """Start the Arch-packaged user-level wallpaper daemon if available."""
+    if not (AWWW and AWWW_DAEMON):
+        return False
+    if run("awww","query")[0] == 0:
+        return True
+    sp.Popen([AWWW_DAEMON,"--no-cache"],stdout=sp.DEVNULL,
+             stderr=sp.DEVNULL,start_new_session=True)
+    for _ in range(12):
+        if run(AWWW,"query",timeout=2)[0] == 0:
+            return True
+        time.sleep(.15)
+    return False
+
+def hyprpaper_apply(file):
+    """Fallback and Catppuccin wallpaper management using existing Hyprpaper."""
+    if run("pgrep","-x","hyprpaper")[0] != 0:
+        sp.Popen(["hyprpaper"],stdout=sp.DEVNULL,
+                 stderr=sp.DEVNULL,start_new_session=True)
+        for _ in range(12):
+            if run("hyprctl","hyprpaper","listactive",timeout=2)[0] == 0:break
+            time.sleep(.15)
     rc,monitors,_=run("hyprctl","monitors","-j")
-    if rc:return
+    if rc:return False
+    success=False
     try:
         for mon in json.loads(monitors):
-            run("hyprctl","hyprpaper","wallpaper",f"{mon['name']},{file},cover",timeout=10)
+            rc,output,_=run("hyprctl","hyprpaper","wallpaper",
+                            f"{mon['name']},{file},contain",timeout=10)
+            success|=(rc==0)
     except (ValueError,KeyError):pass
-def refresh_all():
-    run("pkill","-USR2","waybar")
+    return success
+
+def wallpaper_apply(file):
+    if not file.is_file():return
+    if awww_ready():
+        rc,_,err=run(AWWW,"img","--resize","fit","--transition-type","fade",
+                     "--transition-duration","0.38","--transition-fps","60",str(file),
+                     timeout=12)
+        if rc==0:
+            # Swap daemons only after the replacement image was submitted.
+            if run("pgrep","-x","hyprpaper")[0] == 0:
+                run("pkill","-TERM","-x","hyprpaper")
+            return
+        print("awww image update failed: "+err,file=sys.stderr)
+    # No awww: preserve wallpapers via Hyprpaper, though its switches can flash.
+    hyprpaper_apply(file)
+
+def restore_original_wallpaper(file):
+    if not file.is_file():return
+    # Create the original wallpaper behind awww first to avoid revealing an
+    # empty compositor background while changing back to Catppuccin.
+    if hyprpaper_apply(file):
+        if AWWW and run(AWWW,"query")[0] == 0:
+            run(AWWW,"kill")
+
+def refresh_all(waybar=True):
+    # A full Waybar SIGUSR2 on every workspace switch briefly flashes the bar.
+    # Keep it stable during transitions; reload only for explicit theme changes.
+    if waybar:run("pkill","-USR2","waybar")
     run("makoctl","reload")
 def workspace():
     rc,out,_=run("hyprctl","activeworkspace","-j")
@@ -215,7 +266,7 @@ def update_current(force=False):
     a=p["accent"][1:]+"ee"; b=p["edge"][1:]+"b0"
     apply_border([a,b],p["edge"][1:]+"66",55)
     wallpaper_apply(WALLS/(wall+".png"))
-    refresh_all()
+    refresh_all(waybar=force)
     (STATE/"last-workspace").write_text(f"{index} {theme} {wall}\n")
 def choose(theme):
     if theme not in (*THEMES,"catppuccin"):raise SystemExit("Theme must be imperial, sith, rakatan, or catppuccin")
@@ -264,10 +315,6 @@ def watch():
                                 if SELECTION.exists() and SELECTION.read_text().strip()!="catppuccin":update_current()
         except (OSError,ValueError):
             time.sleep(3)
-def chooser():
-    labels=["Imperial hybrid (workspace accents)","Sith Archives (fallback global)","Rakatan Research (fallback global)","Restore Catppuccin"]
-    rc,out,_=run("wofi","--dmenu","--insensitive","--prompt","Galactic Appearance",timeout=120)
-    # --dmenu needs stdin; handled by subprocess below.
 def menu():
     labels=["Imperial hybrid / Sith and Rakatan sectors","Sith Archives global fallback","Rakatan Research global fallback","Restore Catppuccin"]
     try:

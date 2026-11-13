@@ -174,3 +174,7 @@ The optional **Galactic Appearance** theme adds original Imperial Command, Sith 
 - Wallpapers are locally generated from original SVGs without downloading copyrighted images. Movement uses the existing Hyprland animations rather than battery-hungry video wallpapers.
 
 See [Galactic Appearance setup, tests and rollback](docs/STARWARS-THEME.md). Installation requires `rsvg-convert` (librsvg) to generate wallpapers; the installer does not force a theme change.
+
+### Wallpaper fit and seamless switching
+
+The six Star Wars wallpapers are now rendered for the Chromebook's **1920×1200 (16:10)** panel so the headings remain visible. **awww** provides a short fade between workspaces and prevents Hyprpaper's logo flash; the original Hyprpaper is automatically restored with Catppuccin. Hyprland's default logo is disabled, and Waybar is no longer fully reloaded during every workspace change. Install the optional managed backend on new Arch systems with `sudo pacman -S --needed awww` (otherwise the theme falls back to Hyprpaper). See [troubleshooting and recovery](docs/STARWARS-THEME.md).

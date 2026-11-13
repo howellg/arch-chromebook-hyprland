@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix="starwars-theme-isolated-") as dirname:
     wp=home/".local/share/starwars-theme/wallpapers";wp.mkdir(parents=True)
     for name in ("imperial","sith","rakatan"): (wp/(name+".png")).write_bytes(b"test-png")
     fake=home/"fakebin";fake.mkdir()
-    for cmd in ("hyprctl","pkill","makoctl","pgrep","hyprpaper"):
+    for cmd in ("hyprctl","pkill","makoctl","pgrep","hyprpaper","awww","awww-daemon"):
         p=fake/cmd;p.write_text("#!/bin/sh\nexit 1\n");p.chmod(0o755)
     env={**os.environ,"HOME":str(home),"PATH":str(fake)+":"+os.environ["PATH"]}
     def invoke(*args):

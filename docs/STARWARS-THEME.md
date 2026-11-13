@@ -45,3 +45,21 @@ nohup ~/.local/bin/hypr-starwars watch >/dev/null 2>&1 </dev/null &
 - Reversibility is tested before switching on the live desktop.
 
 All wallpaper art and theme styles are configured locally. No licensed logos, soundtracks, or third-party image dependencies are bundled.
+
+## Wallpaper framing and transitions (November 2026 fix)
+
+The Chromebook's internal panel is **1920×1200 (16:10)** at 1.5× Wayland scaling. The earlier **1920×1080** backgrounds were cropped horizontally by `cover`, cutting off the left-hand titles. `generate_wallpapers.py` now renders all six original SVG backgrounds at **1920×1200**, moves the titles farther inside a safe margin, and ensures the foreground labels stay visible.
+
+**Flicker-free wallpaper switching:** Hyprpaper v0.8.5 may clear its wallpaper surface briefly when switching images, exposing Hyprland's default logo. The optional **awww 0.12.1** Wayland background daemon uses a continuous layer and a 0.38-second, 60 fps fade instead of replacing the surface. Hyprland's default logo and forced default wallpaper are disabled. The watcher avoids unnecessary full Waybar reloads on each workspace change to reduce additional flashing.
+
+**Install the managed backend** on another Arch device using:
+
+```bash
+sudo pacman -S --needed awww
+```
+
+On the original Chromebook, when remote tools could not authorize installing a system package, only the `awww` and `awww-daemon` binaries were extracted to `~/.local/bin` from Arch's official **0.12.1-1 x86_64** package after verifying its detached package signature against the Arch Linux keyring (signed by an official Arch packager). Those user-local binaries are *not* pacman-managed; installing `awww` normally through pacman later will take precedence. The repository does **not** ship third-party binaries.
+
+If `awww` is absent or fails to start, the switcher falls back to Hyprpaper. When **Restore Catppuccin** is selected, Hyprpaper resumes using the original wallpaper, then awww exits.
+
+**Tests:** Rendered six 1920×1200 PNGs; observed awww switching among Fleet Communications (workspace 4), Sith Archives (workspace 2), and Imperial (workspace 1); verified original Catppuccin launcher CSS was restored byte-for-byte; reactivated Imperial with a fresh awww daemon; verified Hyprland reports no configuration errors.

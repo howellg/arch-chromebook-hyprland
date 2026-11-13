@@ -64,6 +64,9 @@ echo "Installed $copies files, skipped $skips."
 if [[ -f "$repo/themes/starwars/generate_wallpapers.py" ]] && command -v rsvg-convert >/dev/null; then
   python3 "$repo/themes/starwars/generate_wallpapers.py" || echo "Wallpaper generation failed; Catppuccin remains available."
 fi
+if [[ ! -x "$HOME/.local/bin/awww" ]] && ! command -v awww >/dev/null 2>&1; then
+  echo "Tip: sudo pacman -S --needed awww   # optional flicker-free Star Wars wallpaper fades"
+fi
 mkdir -p "$HOME/.config/chromebook"
 printf "%s\n" "$repo" > "$HOME/.config/chromebook/repository-path"
 
