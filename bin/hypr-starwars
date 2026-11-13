@@ -143,25 +143,34 @@ window.quick-settings slider {{background:{p['accent']};border-radius:8px;min-wi
 def mako(p):
     return f"""# {p['label']} alert console
 font=JetBrainsMono Nerd Font 11
-background-color={p['bg']}f2
+background-color={p['card']}fa
 text-color={p['text']}
-border-color={p['accent']}
-border-size=2
-border-radius=5
+border-color={p['accent']}9e
+border-size=1
+border-radius=3,8,3,8
 width=355
-height=120
-padding=13
-margin=8
+height=145
+padding=12,15
+margin=7
 outer-margin=54,12,12,12
 anchor=top-right
 max-visible=3
 default-timeout=6500
 ignore-timeout=0
 icons=1
-max-icon-size=48
-progress-color=over {p['accent']}
+max-icon-size=36
+markup=1
+format=<span font_family="Galactic Sector" foreground="{p['accent']}">\ue904</span>  <span foreground="{p['muted']}">%a</span>\\n<b>%s</b>\\n%b
+[grouped]
+format=<span font_family="Galactic Sector" foreground="{p['accent']}">\ue904</span>  <span foreground="{p['muted']}">%a · %g</span>\\n<b>%s</b>\\n%b
+[app-name="Chromebook controls"]
+background-color={p['bg']}fa
+format=<b>%s</b>\\n<span foreground="{p['accent']}">%b</span>
+history=0
 [urgency=critical]
-border-color=#f05b5b
+background-color=#2d151ffc
+border-color=#ff626a
+border-size=2
 default-timeout=0
 [mode=do-not-disturb]
 invisible=1
