@@ -50,7 +50,7 @@ static func snapshot() -> Dictionary:
                 continue
             var cls: String = str(c.get("class", "Application"))
             var title: String = str(c.get("title", "")).strip_edges()
-            if cls.to_lower().contains("godot") or title.begins_with("Sith Holocron Vault"):
+            if cls == "Sith Holocron Vault" or cls.to_lower().contains("godot") or title.begins_with("Sith Holocron Vault"):
                 continue
             var item: Dictionary = records[ws]
             item["count"] = int(item["count"]) + 1
@@ -67,3 +67,17 @@ static func switch_to(workspace_id: int) -> bool:
     var expression: String = "hl.dsp.focus({ workspace = %d })" % workspace_id
     var output: Array = []
     return OS.execute("hyprctl", PackedStringArray(["dispatch", expression]), output, true) == 0
+
+static func remember(workspace_id: int) -> void:
+    var path := OS.get_environment("HOME") + "/.local/state/sith-vault/recent"
+    var history := PackedStringArray([str(workspace_id)])
+    if FileAccess.file_exists(path):
+        for line in FileAccess.get_file_as_string(path).split("\n", false):
+            if line.is_valid_int() and int(line) in WORKSPACES and line not in history:
+                history.append(line)
+    var file := FileAccess.open(path + ".tmp", FileAccess.WRITE)
+    if file == null:
+        return
+    file.store_string("\n".join(history) + "\n")
+    file.close()
+    DirAccess.rename_absolute(path + ".tmp", path)

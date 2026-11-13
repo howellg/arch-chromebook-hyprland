@@ -13,10 +13,11 @@ window/size/window_width_override=1160
 window/size/window_height_override=700
 window/size/resizable=false
 window/size/borderless=true
-window/size/always_on_top=true
 window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
 
 [rendering]
+anti_aliasing/quality/msaa_3d=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.024, 0.025, 0.038, 1)

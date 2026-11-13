@@ -65,16 +65,35 @@ def terminals():
     selected=choose("HOLO-NET / TERMINAL PROFILES",list(labels))
     if selected in labels:launch(str(BIN/"hypr-galactic-terminal"),labels[selected])
 
+def recent_workspaces():
+    names = {1: "Citadel", 2: "Sith Archives", 3: "Rakatan Forge",
+             4: "HoloNet", 5: "Imperial Databank", 9: "Command Relay"}
+    try:
+        history = (HOME / ".local/state/sith-vault/recent").read_text().splitlines()
+    except (OSError, UnicodeError):
+        history = []
+    destinations = {f"{id:02d}  {name}": id for id, name in names.items()}
+    options = {label: id for line in dict.fromkeys(history)
+               for label, id in destinations.items() if line == str(id)}
+    if not options:
+        launch(str(BIN / "hypr-sith-vault"))
+        return
+    selected = choose("HOLO-NET / RECENT WORKSPACES", list(options))
+    if selected in options:
+        launch("hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {options[selected]} }})")
+
 def main():
     if "--test" in sys.argv:
-        print("HOLO-NET menu: apps, projects, system, terminal profiles, theme")
+        print("HOLO-NET menu: apps, projects, system, terminal profiles, theme, Sith Vault, recent workspaces")
         return
     entries={
       "󰀻  APPLICATIONS   /   Installed Programs":"apps",
       "󰉋  PROJECTS       /   Recent Workspace Folders":"projects",
       "󰒓  COMMAND       /   System Utilities":"system",
       "  TERMINALS     /   Sith · Rakatan · Imperial":"terminals",
-      "󰍹  APPEARANCE    /   Galactic Themes":"theme"
+      "󰍹  APPEARANCE    /   Galactic Themes":"theme",
+      "◇  SITH HOLOCRON VAULT":"vault",
+      "↶  RECENT WORKSPACES":"recent"
     }
     selected=choose("HOLO-NET / COMMAND CONSOLE",list(entries),width=625,height=360)
     action=entries.get(selected)
@@ -83,4 +102,6 @@ def main():
     elif action=="system":system()
     elif action=="terminals":terminals()
     elif action=="theme":launch(str(BIN/"hypr-starwars"),"menu")
+    elif action=="vault":launch(str(BIN/"hypr-sith-vault"))
+    elif action=="recent":recent_workspaces()
 if __name__=="__main__":main()

@@ -77,7 +77,7 @@ On Chromebooks, Super usually means the Search/Launcher key. Search the full liv
 | Super+L | Lock screen |
 | Super+Shift+E | Power menu |
 | Super+comma | Search all current shortcuts |
-| Super+Tab | Search windows |
+| Super+Tab | Sith Holocron Vault workspace picker |
 | Super+1..0 | Switch workspaces 1–10 |
 | Super+Shift+1..0 | Move window to workspace |
 | Super+Shift+N | Toggle Do Not Disturb |
@@ -195,8 +195,8 @@ The themed Kitty terminals now use five-line mission-status introductions and ma
 
 A **fully rendered, original 3D** Sith Holocron Vault has been added alongside the existing Hyprland overview. The scene uses KOTOR/Legends-era Sith stone architecture, a rotating Rakatan mechanism, and six selectable floating holocrons. It has two alternate 3D navigation views: **Rakatan Star Map** and **Imperial Holotable**. All geometry is built procedurally in Godot—no AI-generated wallpaper art or third-party models.
 
-Press **Super+Shift+J** (or search **Sith Holocron Vault** in the application launcher) to open it. Arrow keys and number keys highlight a workspace; Enter switches and Esc closes. Switch 3D modes with **S**, **G**, and **I**. Live window titles and counts come from Hyprland, and only whitelisted workspace IDs 1/2/3/4/5/9 can be activated.
+Press **Super+Tab** or **Super+Shift+J** (or search **Sith Holocron Vault** in the application launcher) to open it. Arrow keys and number keys highlight a workspace; Enter switches and Esc closes. Switch 3D modes with **S**, **G**, and **I**. Live window titles and counts come from Hyprland, and only whitelisted workspace IDs 1/2/3/4/5/9 can be activated.
 
-**Super+Tab is unchanged.** Godot opens as a separate floating window and quits when switching or closing; the OpenGL Compatibility renderer is limited to 45 FPS for the Chromebook.
+The Vault opens fullscreen and quits when switching or closing. The OpenGL Compatibility renderer uses 2× MSAA and a 45 FPS cap. HoloNet can open the Vault or revisit workspaces recently selected in it.
 
 Source code, keyboard controls, installation and test instructions: [apps/sith-holocron-vault/README.md](apps/sith-holocron-vault/README.md). Godot 4.7+ is required (`sudo pacman -S godot` on Arch); the Chromebook already has a SHA512-verified portable Godot 4.7.2 installation.

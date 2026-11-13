@@ -34,7 +34,7 @@ Actual gesture support varies across touchpads.
 
 ## Window overview and workspaces
 
-Press Super+Tab or the Chromebook physical Overview key. The GTK grid displays open window titles and workspace names, with captured thumbnails for windows **visible on the currently active workspace**. Offscreen windows show an icon rather than inventing a thumbnail.
+Press the Chromebook’s physical Overview key. The GTK grid displays open window titles and workspace names, with captured thumbnails for windows **visible on the currently active workspace**. Offscreen windows show an icon rather than inventing a thumbnail.
 
 Waybar workspaces display application-related icons: Firefox (1), VS Code (2), Discord (3), and Desktop Commander (9). Certain calculators, audio tools, connection editors and file chooser windows open as centered, floating utilities.
 

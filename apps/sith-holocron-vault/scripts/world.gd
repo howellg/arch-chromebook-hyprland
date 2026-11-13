@@ -13,10 +13,13 @@ var map_root: Node3D
 var tactical_root: Node3D
 var camera: Camera3D
 var gems: Dictionary = {}
-var floating_parts: Dictionary = {}
+var pedestal_lights: Dictionary = {}
+var map_routes: Dictionary = {}
+var sector_centers: Dictionary = {}
+var sector_lamps: Dictionary = {}
 var core_rings: Array[Node3D] = []
 var mode: String = "vault"
-var active_id: int = 2
+var active_id: int = -1
 var clock: float = 0.0
 var metal: StandardMaterial3D
 var basalt: StandardMaterial3D
@@ -106,7 +109,7 @@ func _label(parent: Node3D, value: String, mat_color: Color, at: Vector3, px: in
     l.text = value
     l.position = at
     l.font_size = px
-    l.pixel_size = 0.007
+    l.pixel_size = 0.0085
     l.modulate = mat_color
     l.outline_size = 6
     l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -142,13 +145,13 @@ func _setup_scene() -> void:
         add_child(light)
 
     camera = Camera3D.new()
-    camera.fov = 51.0
+    camera.fov = 53.0
     camera.near = 0.1
     camera.far = 85.0
-    camera.position = Vector3(2.4, 8.6, 18.3)
+    camera.position = Vector3(3.7, 10.2, 18.9)
     camera.current = true
     add_child(camera)
-    camera.look_at(Vector3(2.35, 1.65, 0))
+    camera.look_at(Vector3(3.65, 1.35, 0))
 
 func _build_vault() -> void:
     _box(vault_root, Vector3(0, -0.55, 0), Vector3(22, 0.8, 22), basalt)
@@ -175,11 +178,13 @@ func _build_vault() -> void:
         # recessed crimson runes between massive pillars
         var outer: Vector3 = radial * 8.9
         _box(vault_root, outer + Vector3(0, 0.1, 0), Vector3(0.18, 0.05, 0.58), red_glow)
+    var contact := _mat("#101018", 0.0, 1.0)
     for i in range(6):
         var at: Vector3 = STATIONS[i]
         var slot: int = IDS[i]
         var palette: Color = HyprBridge.TINTS[slot]
         var tint: StandardMaterial3D = _mat("#1f1d27", 0.45, 0.4, "#" + palette.to_html(false), 1.7)
+        _cylinder(vault_root, at + Vector3(0, .015, 0), 1.17, .025, contact)
         _cylinder(vault_root, at + Vector3(0, 0.22, 0), 1.06, 0.45, basalt_light)
         _cylinder(vault_root, at + Vector3(0, 0.49, 0), 0.84, 0.13, metal)
         _torus(vault_root, at + Vector3(0, 0.58, 0), 0.78, 0.055, tint)
@@ -191,7 +196,13 @@ func _build_vault() -> void:
         vault_root.add_child(gem_root)
         _build_holocron(gem_root, palette)
         gems[slot] = gem_root
-        floating_parts[slot] = tint
+        var light := OmniLight3D.new()
+        light.position = at + Vector3(0, 2.1, 0)
+        light.light_color = palette
+        light.omni_range = 3.5
+        light.light_energy = 0.13
+        vault_root.add_child(light)
+        pedestal_lights[slot] = light
         _label(vault_root, "%02d / %s" % [slot, str(HyprBridge.NAMES[slot])],
             palette, at + Vector3(0, 3.75, 0), 30)
 
@@ -200,6 +211,15 @@ func _build_vault() -> void:
     _torus(vault_root, Vector3(0, 0.94, 0), 1.45, 0.09, red_glow)
     _cylinder(vault_root, Vector3(0, 1.35, 0), 1.06, 1.0, blackstone)
     _cylinder(vault_root, Vector3(0, 1.96, 0), 0.82, 0.20, metal)
+    for i in range(8):
+        var rune := Node3D.new()
+        var angle := float(i) * TAU / 8.0
+        rune.position = Vector3(sin(angle) * 1.18, 1.13, cos(angle) * 1.18)
+        rune.rotation.y = angle
+        vault_root.add_child(rune)
+        _rod(rune, Vector3(-.11, -.19, 0), Vector3(0, .17, 0), .018, gold)
+        _rod(rune, Vector3(0, .17, 0), Vector3(.11, -.19, 0), .018, gold)
+        _rod(rune, Vector3(-.08, -.09, 0), Vector3(.08, -.09, 0), .012, red_glow)
     _build_central_core(vault_root)
     for angle in range(8):
         var theta: float = float(angle) * TAU / 8.0
@@ -215,7 +235,7 @@ func _build_column(parent: Node3D, pos: Vector3) -> void:
 
 func _build_holocron(parent: Node3D, palette: Color) -> void:
     var tint: String = "#" + palette.to_html(false)
-    var gem_mat: StandardMaterial3D = _mat("#32252b", 0.50, 0.24, tint, 1.4)
+    var gem_mat: StandardMaterial3D = _mat("#372c36", 0.42, 0.24, tint, 0.58)
     var lines: StandardMaterial3D = _mat("#9f3949", 0.5, 0.23, tint, 2.2)
     var top := Vector3(0, .72, 0)
     var bottom := Vector3(0, -.72, 0)
@@ -232,11 +252,13 @@ func _build_holocron(parent: Node3D, palette: Color) -> void:
         for pt in [bottom, base[j], base[i]]:
             surface.add_vertex(pt)
     surface.generate_normals()
-    _shape(parent, surface.commit(), gem_mat, Vector3.ZERO)
+    _shape(parent, surface.commit(), gem_mat, Vector3.ZERO, Vector3.ONE * .91)
     for i in range(4):
-        _rod(parent, top, base[i], .035, lines)
-        _rod(parent, bottom, base[i], .035, lines)
-        _rod(parent, base[i], base[(i + 1) % 4], .035, lines)
+        _rod(parent, top, base[i], .054, metal)
+        _rod(parent, bottom, base[i], .054, metal)
+        _rod(parent, base[i], base[(i + 1) % 4], .059, metal)
+        _rod(parent, top * .94, base[i] * .94, .019, lines)
+        _rod(parent, bottom * .94, base[i] * .94, .019, lines)
     _torus(parent, Vector3.ZERO, .92, .025, lines)
     _cylinder(parent, Vector3.ZERO, .10, 1.10, lines, 8)
     var dot := OmniLight3D.new()
@@ -247,17 +269,17 @@ func _build_holocron(parent: Node3D, palette: Color) -> void:
 
 func _build_central_core(parent: Node3D) -> void:
     var hub := Node3D.new()
-    hub.position = Vector3(0, 3.1, 0)
+    hub.position = Vector3(0, 2.85, 0)
     parent.add_child(hub)
     _build_holocron(hub, Color("#ed526c"))
     hub.scale = Vector3.ONE * 0.92
     core_rings.append(hub)
     for axis in range(3):
         var ring := Node3D.new()
-        ring.position = Vector3(0, 3.1, 0)
+        ring.position = hub.position
         ring.rotation_degrees = Vector3(65 if axis == 0 else 0, axis * 60, 65 if axis == 2 else 0)
         parent.add_child(ring)
-        _torus(ring, Vector3.ZERO, 1.55 + axis * .20, .05, red_glow if axis != 1 else cyan_glow)
+        _torus(ring, Vector3.ZERO, 1.14 + axis * .16, .05, red_glow if axis != 1 else cyan_glow)
         core_rings.append(ring)
 
 func _build_galaxy() -> void:
@@ -273,11 +295,23 @@ func _build_galaxy() -> void:
         var planet_mat: StandardMaterial3D = _mat("#263948", .35, .40,
             "#" + HyprBridge.TINTS[n].to_html(false), 1.2)
         var sphere := SphereMesh.new()
-        sphere.radius = 0.48 if n != 9 else 0.62
+        sphere.radius = [0.59, 0.43, 0.52, 0.47, 0.39, 0.64][i]
         sphere.height = sphere.radius * 2.0
         _shape(map_root, sphere, planet_mat, pos)
         _torus(map_root, pos + Vector3(0, -.55, 0), 0.72, .035, cyan_glow)
-        _rod(map_root, Vector3(0, .65, 0), pos, .013, cyan_glow)
+        var route := _rod(map_root, Vector3(0, .65, 0), pos, .027, cyan_glow)
+        route.material_override = _mat("#123039", 0.0, .6, "#4fe5ff", .18)
+        map_routes[n] = route.material_override
+        if n == 1 or n == 5:
+            var orbit := _torus(map_root, pos, sphere.radius * 1.46, .025, cyan_glow)
+            orbit.rotation_degrees = Vector3(18, 0, 26)
+        if n == 3 or n == 4:
+            var moon := SphereMesh.new()
+            moon.radius = .14
+            moon.height = .28
+            _shape(map_root, moon, planet_mat, pos + Vector3(.73, .3, .21))
+        if n == 9:
+            _torus(map_root, pos, sphere.radius, .025, metal)
         _label(map_root, "%02d / %s" % [n, str(HyprBridge.PLANETS[n])],
             HyprBridge.TINTS[n], pos + Vector3(0, 1.12, 0), 34)
         if i == 0 or i == 3:
@@ -291,16 +325,26 @@ func _build_tactical() -> void:
     for i in range(6):
         var n: int = IDS[i]
         var x: float = -4.9 + float(i % 3) * 4.9
-        var z: float = -2.3 + float(i / 3) * 4.6
+        var z: float = -2.3 + floorf(float(i) / 3.0) * 4.6
         var at := Vector3(x, 0.65, z)
         _box(tactical_root, at, Vector3(3.5, .60, 2.8), basalt_light)
-        _box(tactical_root, at + Vector3(0, .36, 0), Vector3(3.36, .045, 2.64),
-            red_glow if n == 2 else cyan_glow)
+        sector_centers[n] = at + Vector3(0, .44, 0)
+        _box(tactical_root, at + Vector3(0, .36, 0), Vector3(3.36, .045, 2.64), blackstone)
+        _torus(tactical_root, at + Vector3(0, .43, 0), .72, .035, cyan_glow)
         _label(tactical_root, "%02d / %s" % [n, str(HyprBridge.NAMES[n])],
             HyprBridge.TINTS[n], at + Vector3(0, 1.30, 0), 30)
-        for bar in range(7):
-            _box(tactical_root, at + Vector3(-1.35 + bar * .43, .50, .75),
-                Vector3(.20, .13, .11), gold if bar % 3 == 0 else blackstone)
+        var lamps: Array[MeshInstance3D] = []
+        for bar in range(6):
+            lamps.append(_box(tactical_root, at + Vector3(-1.12 + bar * .45, .46, .83),
+                Vector3(.29, .10, .14), basalt_light))
+        sector_lamps[n] = lamps
+
+func update_occupancy(records: Dictionary) -> void:
+    for id in IDS:
+        var count := int(records.get(id, {}).get("count", 0))
+        var lamps: Array = sector_lamps[id]
+        for i in range(lamps.size()):
+            lamps[i].material_override = cyan_glow if i < count else basalt_light
 
 func set_mode(value: String) -> void:
     mode = value
@@ -310,7 +354,11 @@ func set_mode(value: String) -> void:
 
 func update_scene(delta: float, focus: int) -> void:
     clock += delta
-    active_id = focus
+    if active_id != focus:
+        active_id = focus
+        for id in IDS:
+            pedestal_lights[id].light_energy = 1.1 if id == focus else .13
+            map_routes[id].emission_energy_multiplier = 1.8 if id == focus else .18
     if mode == "vault":
         for i in range(6):
             var slot: int = IDS[i]
