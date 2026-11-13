@@ -212,3 +212,6 @@ The effect follows Hyprland’s animation setting. To skip it for one launch, us
 The Galactic desktop panels share a short horizontal opening reveal. It
 follows the Hyprland and GTK animation settings and keeps keyboard and
 pointer input available as soon as a panel opens.
+
+Workspace 5 uses the Imperial Databank vault wallpaper, with gold-lit datacard
+racks framing the central archive door.
