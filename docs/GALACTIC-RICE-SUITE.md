@@ -109,4 +109,4 @@ Quick Settings shares the console styling. Volume and brightness show
 ten-percent ticks, and the battery card uses a segmented meter.
 
 In an Imperial terminal, `galactic info` pairs the hardware report with
-a Star Destroyer. Use `fastfetch` for the standard report.
+a Death Star. Use `fastfetch` for the standard report.
