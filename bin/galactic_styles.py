@@ -26,8 +26,13 @@ def waybar_config(original, home):
         "on-click":str(home/".local/bin/hypr-starwars-menu"),
         "on-click-right":str(home/".local/bin/hypr-holonet-launcher")
     }
-    config["hyprland/workspaces"]["format-icons"].update({
-        "1":"󰈹","2":"󰞀","3":"󰨞","4":"󰙯","5":"󰘧","9":"󰚩"})
+    if "custom/arch" in config:
+        config["custom/arch"]["format"] = "\ue900"  # TIE fighter
+    workspaces = config["hyprland/workspaces"]
+    workspaces["format"] = "{icon} {name}"
+    workspaces["format-icons"].update({
+        str(id): chr(0xE901 + index) for index, id in enumerate(SECTORS)
+    })
     # Keep all buttons where they already were: avoid hiding Wi-Fi, battery, etc.
     return json.dumps(config,ensure_ascii=False,indent=4)+"\n"
 
@@ -36,7 +41,7 @@ def waybar(p,original):
     txt=p["text"]; muted=p["muted"]
     return f"""/* STAR WARS // GALACTIC COMMAND // event-driven sector status */
 * {{
-    font-family: "JetBrainsMono Nerd Font",monospace;
+    font-family: "Galactic Sector","JetBrainsMono Nerd Font",monospace;
     font-size: 11px;
     font-weight: 600;
     min-height: 0;
@@ -53,10 +58,10 @@ tooltip label {{color:{txt};}}
 #custom-arch,#workspaces,#custom-sector,#clock,#cpu,#memory,#network,
 #pulseaudio,#backlight,#battery,#tray,#custom-power,#custom-settings,
 #custom-power-profile {{
-    background:alpha({bg},.95);
-    border:1px solid alpha({edge},.78);
-    border-bottom:2px solid alpha({a},.72);
-    border-radius:4px;
+    background:linear-gradient(to bottom, #242630, #11131b);
+    border:1px solid #3b3e4a;
+    border-bottom:1px solid alpha({a},.68);
+    border-radius:0 7px 0 7px;
     padding:4px 7px;
     margin:2px 0;
     color:{txt};
@@ -76,7 +81,8 @@ tooltip label {{color:{txt};}}
     min-width:12px;
 }}
 #workspaces button.active {{
-    color:{bg}; background:{a};
+    color:#fff0ec; background:alpha({a},.26);
+    box-shadow:inset 0 -2px {a};
     font-weight:800;
 }}
 #workspaces button.urgent {{ color:#ffffff; background:#d84a55; }}
@@ -101,12 +107,12 @@ tooltip label {{color:{txt};}}
     color:#f08883; border-bottom-color:#ed6664;
 }}
 #clock {{ color:{txt}; font-size:11px; font-weight:800; padding:4px 11px; }}
-#cpu {{color:#8fb9df;}}
-#memory {{color:#bb9fdc;}}
-#network {{color:#81c9e1;}}
+#cpu {{color:{txt};}}
+#memory {{color:{txt};}}
+#network {{color:{txt};}}
 #pulseaudio {{color:{txt};}}
-#backlight {{color:#e6bf81;}}
-#battery {{color:#96d0ab;}}
+#backlight {{color:{txt};}}
+#battery {{color:{txt};}}
 #battery.warning {{color:#f4b66e;}}
 #battery.critical {{color:#f0777d;}}
 #battery.charging {{color:#81d9c2;}}

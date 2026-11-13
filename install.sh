@@ -59,6 +59,12 @@ if [[ "$dryrun" == 1 ]]; then
 fi
 echo "Installed $copies files, skipped $skips."
 [[ -d "$backup" ]] && echo "Backup directory: $backup"
+# The Galactic theme uses a local symbol font for Waybar.
+font="$HOME/.local/share/fonts/GalacticSector.ttf"
+install -Dm644 "$repo/themes/starwars/GalacticSector.ttf" "$font"
+if command -v fc-cache >/dev/null; then
+  fc-cache "$HOME/.local/share/fonts"
+fi
 # Original Star Wars-inspired wallpapers are generated locally from SVG.
 # Do not auto-apply a faction theme: preserve the user's existing selection.
 if [[ -f "$repo/themes/starwars/generate_wallpapers.py" ]] && command -v rsvg-convert >/dev/null; then
