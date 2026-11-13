@@ -26,11 +26,15 @@ static func _json(args: PackedStringArray) -> Variant:
         return null
     return JSON.parse_string(str(output[0]))
 
+static func animations_enabled() -> bool:
+    var data: Variant = _json(PackedStringArray(["getoption", "animations:enabled", "-j"]))
+    return data is Dictionary and bool(data.get("bool", false))
+
 static func get_current() -> int:
     var data: Variant = _json(PackedStringArray(["activeworkspace", "-j"]))
     if data is Dictionary:
         var found: int = int(data.get("id", 1))
-        return found if found in WORKSPACES else 1
+        return found
     return 1
 
 static func snapshot() -> Dictionary:
@@ -68,7 +72,8 @@ static func switch_to(workspace_id: int) -> bool:
         return false
     var expression: String = "hl.dsp.focus({ workspace = %d })" % workspace_id
     var output: Array = []
-    return OS.execute("hyprctl", PackedStringArray(["dispatch", expression]), output, true) == 0
+    var status := OS.execute("hyprctl", PackedStringArray(["dispatch", expression]), output, true)
+    return status == 0 and not output.is_empty() and str(output[0]).strip_edges() == "ok"
 
 static func remember(workspace_id: int) -> void:
     var path := OS.get_environment("HOME") + "/.local/state/sith-vault/recent"

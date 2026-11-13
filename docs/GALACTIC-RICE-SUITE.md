@@ -203,3 +203,8 @@ existing `hypr-clipboard --clear` command still clears the history.
 
 `galactic info` shows a holocron in Sith Archives and a Star Forge core in
 Rakatan Research, alongside the Imperial Death Star.
+
+Confirmed jumps to another workspace in the Holocron Vault show a short
+hyperspace effect in the destination's sector color. Esc closes the picker,
+including during the transition. The current workspace closes immediately.
+The effect follows Hyprland’s animation setting. To skip it for one launch, use `hypr-sith-vault -- --no-hyperspace`.
