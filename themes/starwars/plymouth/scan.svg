@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="12" viewBox="0 0 240 12">
+  <defs><linearGradient id="beam"><stop stop-color="#eb515e" stop-opacity="0"/><stop offset=".5" stop-color="#ff9094"/><stop offset="1" stop-color="#eb515e" stop-opacity="0"/></linearGradient></defs>
+  <rect x="0" y="5" width="240" height="2" fill="url(#beam)"/>
+  <rect x="12" y="3" width="216" height="6" fill="url(#beam)" opacity=".26"/>
+</svg>

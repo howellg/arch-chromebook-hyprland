@@ -1,0 +1,83 @@
+Window.SetBackgroundTopColor(0.016, 0.018, 0.028);
+Window.SetBackgroundBottomColor(0.035, 0.023, 0.038);
+
+seal_image = Image("insignia.png");
+scan_image = Image("scan.png");
+name_image = Image("wordmark.png");
+seal = Sprite(seal_image);
+scan = Sprite(scan_image);
+wordmark = Sprite(name_image);
+notice = Sprite();
+tick = 0;
+prompt_active = 0;
+seal.SetOpacity(0.25);
+scan.SetOpacity(0);
+wordmark.SetOpacity(0);
+
+fun refresh () {
+    center_x = Window.GetX() + Window.GetWidth() / 2;
+    center_y = Window.GetY() + Window.GetHeight() / 2 - 30;
+    seal.SetPosition(center_x - seal_image.GetWidth() / 2, center_y - 100, 1);
+    wordmark.SetPosition(center_x - name_image.GetWidth() / 2, center_y + 112, 2);
+    if (global.tick < 52)
+        global.tick++;
+    if (global.prompt_active)
+        return 0;
+    if (global.tick < 33) {
+        seal.SetOpacity(0.25 + global.tick * 0.022);
+        scan.SetPosition(center_x - scan_image.GetWidth() / 2,
+                         center_y - 95 + global.tick * 6, 3);
+        scan.SetOpacity(0.85);
+    } else {
+        seal.SetOpacity(1);
+        scan.SetOpacity(0);
+        wordmark.SetOpacity((global.tick - 32) / 20);
+    }
+}
+
+fun show_notice (text, offset) {
+    image = Image.Text(text, 0.95, 0.86, 0.89);
+    notice.SetImage(image);
+    notice.SetPosition(Window.GetX() + (Window.GetWidth() - image.GetWidth()) / 2,
+                       Window.GetY() + Window.GetHeight() / 2 + offset, 4);
+    notice.SetOpacity(1);
+}
+
+fun display_normal () {
+    global.prompt_active = 0;
+    notice.SetOpacity(0);
+}
+
+fun display_password (prompt, count) {
+    global.prompt_active = 1;
+    scan.SetOpacity(0);
+    wordmark.SetOpacity(0);
+    marks = "";
+    for (i = 0; i < count; i++)
+        marks = marks + "*";
+    show_notice(prompt + "  " + marks, 88);
+}
+
+fun display_question (prompt, entry) {
+    global.prompt_active = 1;
+    scan.SetOpacity(0);
+    wordmark.SetOpacity(0);
+    show_notice(prompt + "  " + entry, 88);
+}
+
+fun display_message (text) {
+    if (!global.prompt_active)
+        show_notice(text, 162);
+}
+
+fun hide_message (text) {
+    if (!global.prompt_active)
+        notice.SetOpacity(0);
+}
+
+Plymouth.SetRefreshFunction(refresh);
+Plymouth.SetDisplayNormalFunction(display_normal);
+Plymouth.SetDisplayPasswordFunction(display_password);
+Plymouth.SetDisplayQuestionFunction(display_question);
+Plymouth.SetDisplayMessageFunction(display_message);
+Plymouth.SetHideMessageFunction(hide_message);

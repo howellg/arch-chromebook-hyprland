@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Imperial Startup
+Description=Imperial Command startup sequence
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/imperial-startup
+ScriptFile=/usr/share/plymouth/themes/imperial-startup/imperial-startup.script
