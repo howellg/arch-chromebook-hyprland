@@ -21,6 +21,7 @@ var thumbnail: TextureRect
 var thumbnail_hint: Label
 var preview_address := ""
 var preview_texture: Texture2D
+var workspace_previews: Dictionary = {}
 var status_label: Label
 var sector_buttons: Dictionary = {}
 var focus_color: Color = Color("#ed405d")
@@ -119,13 +120,19 @@ func _build_data_panel() -> void:
     status_label = _text(panel, "", 12, Color("#7fe5e0"), Vector2(20, 430), Vector2(244, 22))
 
 func load_preview(payload: String) -> void:
-    var parts := payload.split(":", false, 1)
-    if parts.size() != 2:
-        return
-    var image := Image.new()
-    if image.load_jpg_from_buffer(Marshalls.base64_to_raw(parts[1])) == OK:
-        preview_address = parts[0]
-        preview_texture = ImageTexture.create_from_image(image)
+    for line in payload.split("\n", false):
+        var parts := line.split(":", false, 1)
+        if parts.size() != 2:
+            continue
+        var image := Image.new()
+        if image.load_jpg_from_buffer(Marshalls.base64_to_raw(parts[1])) != OK:
+            continue
+        var texture := ImageTexture.create_from_image(image)
+        if parts[0].is_valid_int():
+            workspace_previews[int(parts[0])] = texture
+        elif parts[0].begins_with("0x"):
+            preview_address = parts[0]
+            preview_texture = texture
 
 func _app_icon(app_class: String) -> String:
     var name := app_class.to_lower()
@@ -207,7 +214,12 @@ func display(selected: int, mode: String, records: Dictionary, current: int) -> 
     count_label.text = "NO OPEN WINDOWS" if count == 0 else "%d OPEN WINDOW%s" % [count, "" if count == 1 else "S"]
     thumbnail.texture = null
     thumbnail_hint.text = "EMPTY SECTOR" if count == 0 else "NO VISIBLE PREVIEW"
+    if count > 0 and workspace_previews.has(selected):
+        thumbnail.texture = workspace_previews[selected]
+        thumbnail_hint.text = ""
     for client in clients:
+        if thumbnail.texture:
+            break
         if client["address"] == preview_address and preview_texture:
             thumbnail.texture = preview_texture
             thumbnail_hint.text = ""

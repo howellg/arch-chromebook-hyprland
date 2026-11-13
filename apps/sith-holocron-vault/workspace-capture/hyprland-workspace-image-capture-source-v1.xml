@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Client binding for the Hyprland workspace capture source interface. -->
+<protocol name="hyprland_workspace_image_capture_source_v1">
+  <interface name="hyprland_workspace_image_capture_source_manager_v1" version="1">
+    <enum name="capture_mode">
+      <entry name="windows_only" value="0"/>
+      <entry name="everything" value="1"/>
+    </enum>
+    <request name="create_source">
+      <arg name="source" type="new_id" interface="ext_image_capture_source_v1"/>
+      <arg name="workspace" type="object" interface="ext_workspace_handle_v1"/>
+      <arg name="mode" type="uint" enum="capture_mode"/>
+    </request>
+    <request name="destroy" type="destructor"/>
+  </interface>
+</protocol>

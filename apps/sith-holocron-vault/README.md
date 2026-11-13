@@ -85,7 +85,16 @@ The launcher requests fullscreen. For windowed preview, launch with `--windowed`
 - KOTOR / SWTOR-inspired, not a recreation of a commercial game scene.
 - The app exits as soon as a workspace is chosen, keeping continuous GPU use at zero when closed.
 
-The workspace dossier shows window titles and app-type icons. The launcher
-captures one small preview of the focused window before opening fullscreen,
-when the compositor can supply its visible pixels. Preview pixels stay in
-memory. Workspaces without a matching capture show their window list.
+The workspace dossier shows window titles, app-type icons, and a snapshot of
+each occupied workspace when the Vault opens. Hyprland renders these through
+its workspace capture protocol without switching workspaces. Preview pixels
+stay in memory. A focused-window preview remains available as a fallback.
+
+The installer builds the capture helper when a C compiler, pkg-config,
+wayland-scanner, wayland-protocols, and libturbojpeg are available. To build
+only the helper from the repository root:
+
+```bash
+bash apps/sith-holocron-vault/workspace-capture/build.sh \
+  "$HOME/.local/share/sith-holocron-vault/workspace-capture"
+```

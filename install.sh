@@ -73,6 +73,13 @@ fi
 if [[ ! -x "$HOME/.local/bin/awww" ]] && ! command -v awww >/dev/null 2>&1; then
   echo "Tip: sudo pacman -S --needed awww   # optional flicker-free Star Wars wallpaper fades"
 fi
+capture_src="$repo/apps/sith-holocron-vault/workspace-capture"
+if command -v cc >/dev/null && command -v wayland-scanner >/dev/null &&
+   command -v pkg-config >/dev/null &&
+   pkg-config --exists wayland-client wayland-protocols libturbojpeg; then
+  bash "$capture_src/build.sh" "$HOME/.local/share/sith-holocron-vault/workspace-capture" ||
+    echo "Vault workspace capture build failed; the focused-window fallback remains available."
+fi
 mkdir -p "$HOME/.config/chromebook"
 printf "%s\n" "$repo" > "$HOME/.config/chromebook/repository-path"
 
