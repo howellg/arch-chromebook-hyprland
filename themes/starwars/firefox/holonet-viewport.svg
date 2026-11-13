@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="glow" cx=".5" cy=".38" r=".64">
+      <stop stop-color="#2d222d"/><stop offset="1" stop-color="#10131c"/>
+    </radialGradient>
+    <pattern id="stars" width="211" height="173" patternUnits="userSpaceOnUse" fill="#a9b4ca">
+      <circle cx="18" cy="63" r="1" opacity=".45"/><circle cx="162" cy="38" r="1.4" opacity=".32"/>
+      <circle cx="97" cy="112" r=".8" opacity=".49"/><circle cx="196" cy="157" r=".9" opacity=".38"/>
+      <circle cx="56" cy="150" r="1.2" opacity=".25"/>
+    </pattern>
+  </defs>
+  <path fill="url(#glow)" d="M0 0h1600v1000H0z"/>
+  <path fill="url(#stars)" d="M0 0h1600v1000H0z"/>
+  <g fill="none" stroke="#5b3645" opacity=".6">
+    <circle cx="800" cy="398" r="250" stroke-dasharray="3 11"/>
+    <circle cx="800" cy="398" r="276"/>
+    <path d="M62 268V100h216m1044 0h216v168M62 736v164h216m1044 0h216V736" stroke-width="3"/>
+  </g>
+  <g fill="#c65e65" opacity=".6">
+    <path d="M62 96h87v4H62zm1389 0h87v4h-87zM62 900h87v4H62zm1389 0h87v4h-87z"/>
+  </g>
+  <path d="M0 0h245L116 85 0 108zm1600 0h-245l129 85 116 23zM0 1000h218L92 920 0 900zm1600 0h-218l126-80 92-20z" fill="#151925" stroke="#393c49" stroke-width="2"/>
+</svg>

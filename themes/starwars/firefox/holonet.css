@@ -1,0 +1,52 @@
+/* Firefox Home and New Tab share the native Activity Stream interface. */
+@-moz-document url("about:newtab"), url("about:home") {
+  @media (forced-colors: none) {
+    :root, body {
+      color-scheme: dark !important;
+      --newtab-background-color: #10131c !important;
+      --newtab-background-color-secondary: #1b202c !important;
+      --newtab-text-primary-color: #eeeaeb !important;
+      --newtab-text-secondary-color: #b5b9c5 !important;
+      --newtab-weather-background-color: #1b202c !important;
+      --color-accent-primary: #ed7775 !important;
+      --focus-outline-color: #ed7775 !important;
+      background-color: #10131c !important;
+    }
+
+    body {
+      background-image: url("holonet-viewport.svg") !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-attachment: fixed !important;
+    }
+
+    .logo-and-wordmark .logo {
+      background: url("tie-fighter.svg") center / 75% no-repeat !important;
+    }
+
+    .logo-and-wordmark .wordmark {
+      background: url("holonet-wordmark.svg") center / contain no-repeat !important;
+      inline-size: clamp(120px, 23vw, 265px) !important;
+    }
+
+    .search-handoff-button,
+    .search-inner-wrapper > moz-urlbar {
+      background-color: #171b26 !important;
+      border: 1px solid #74414c !important;
+      border-radius: 0 12px 0 12px !important;
+      box-shadow: inset 0 -2px #a74750 !important;
+    }
+
+    .search-handoff-button:focus-visible,
+    .search-inner-wrapper > moz-urlbar:focus-within {
+      outline: 2px solid #ed7775 !important;
+      outline-offset: 3px;
+    }
+
+    .card-outer, .weatherCard, .weather-card {
+      background-color: #1b202c !important;
+      border-color: #434856 !important;
+      border-radius: 0 10px 0 10px !important;
+    }
+  }
+}
