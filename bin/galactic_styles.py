@@ -174,11 +174,13 @@ window.quick-settings slider {{
 }}
 """
 
-def lock(p):
+def lock(p, artwork=None):
     def rgb(hexval):
         return "rgb("+", ".join(str(int(hexval[i:i+2],16)) for i in (1,3,5))+")"
     txt=rgb(p["text"]);accent=rgb(p["accent"]);muted=rgb(p["muted"])
     card=rgb(p["card"]);bg=rgb(p["bg"])
+    background = f"    path = {artwork}\n" if artwork and artwork.is_file() else ""
+    insignia = "\ue901" if p["label"] == "IMPERIAL COMMAND" else "\ue902" if p["label"] == "SITH ARCHIVES" else "\ue903"
     return f"""# Star Wars Imperial Security / Galactic authorization terminal
 # Authentication is still handled by Hyprlock/PAM. No custom password handling.
 general {{
@@ -186,7 +188,7 @@ general {{
 }}
 background {{
     monitor =
-    color = {bg}
+{background}    color = {bg}
 }}
 # Brief command heading in the upper third.
 label {{
@@ -201,11 +203,11 @@ label {{
 }}
 label {{
     monitor =
-    text = AUTHORIZED PERSONNEL ONLY
-    color = {muted}
-    font_size = 14
-    font_family = JetBrainsMono Nerd Font
-    position = 0, 213
+    text = {insignia}
+    color = {accent}
+    font_size = 29
+    font_family = Galactic Sector
+    position = 0, 205
     halign = center
     valign = center
 }}
@@ -232,7 +234,8 @@ label {{
 input-field {{
     monitor =
     size = 360, 62
-    outline_thickness = 3
+    outline_thickness = 2
+    rounding = 5
     dots_size = 0.19
     dots_spacing = 0.24
     dots_center = true
@@ -249,7 +252,7 @@ input-field {{
 }}
 label {{
     monitor =
-    text = IMPERIAL ARCHIVES  /  SECURE SESSION
+    text = {p["label"]}  /  SECURE SESSION
     color = {muted}
     font_size = 12
     font_family = JetBrainsMono Nerd Font

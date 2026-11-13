@@ -13,7 +13,6 @@ SCENES={
  "rakatan":("#071623","#0a3042","#58d4e6","#d5aa61","RAKATAN RESEARCH","ANCIENT SYSTEM • STAR FORGE"),
  "databank":("#11121a","#292523","#d6af6a","#95abb8","IMPERIAL DATABANK","RECORDS • SECURE ACCESS"),
  "comms":("#0b1524","#223146","#8ab9d2","#d3a47b","FLEET COMMUNICATIONS","HOLO-NET • ONLINE"),
- "bridge":("#100f17","#291b25","#f0746b","#a4adb8","COMMAND BRIDGE","PRIORITY CHANNEL • NINE")
 }
 def shape(seed):
     rng=random.Random(seed)
@@ -48,7 +47,7 @@ def svg(name,palette):
 <text x="1460" y="1132" font-size="16" letter-spacing="3" fill="{accent}">SECURE TERMINAL</text></g>
 <g fill="{accent}" opacity=".48"><rect x="150" y="625" width="440" height="3"/>{bars}</g></svg>'''
 def main():
-    for name in (*SCENES, "sith"):
+    for name in (*SCENES, "sith", "bridge"):
         source=ROOT/(name+".svg")
         if name in SCENES:
             source.write_text(svg(name, SCENES[name]))
