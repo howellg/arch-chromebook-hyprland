@@ -18,22 +18,25 @@ home=Path.home()
 screens=home/"Pictures/Screenshots"
 screens.mkdir(parents=True,exist_ok=True)
 mode=sys.argv[1] if len(sys.argv)>1 else "region"
-if mode not in ("region","full"):
-    raise SystemExit("Usage: hypr-screenshot-edit [region|full]")
+if mode not in ("region","full","--stdin"):
+    raise SystemExit("Usage: hypr-screenshot-edit [region|full|--stdin]")
 
 capture=tempfile.NamedTemporaryFile(suffix=".png",prefix="chromebook-edit-",delete=False)
 temp=Path(capture.name);capture.close()
 try:
+    if mode == "--stdin":
+        temp.write_bytes(sys.stdin.buffer.read())
     args=["grim","-t","png"]
     if mode=="region":
         selected=subprocess.run(["slurp"],capture_output=True,text=True)
         if selected.returncode or not selected.stdout.strip():raise SystemExit(0)
         args.extend(["-g",selected.stdout.strip()])
     args.append(str(temp))
-    result=subprocess.run(args,capture_output=True)
-    if result.returncode:raise SystemExit("grim failed: "+result.stderr.decode(errors="replace"))
+    if mode != "--stdin":
+        result=subprocess.run(args,capture_output=True)
+        if result.returncode:raise RuntimeError("grim failed: "+result.stderr.decode(errors="replace"))
     source=GdkPixbuf.Pixbuf.new_from_file(str(temp))
-except Exception:
+except BaseException:
     temp.unlink(missing_ok=True)
     raise
 

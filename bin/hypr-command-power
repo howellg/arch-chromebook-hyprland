@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Command Bridge power controls."""
+from pathlib import Path
+import subprocess
+from galactic_panel import Gtk, heading, panel
+
+ACTIONS = (
+    ("󰌾", "Lock screen", ("loginctl", "lock-session")),
+    ("󰤄", "Suspend", ("systemctl", "suspend")),
+    ("󰍃", "Log out", ("hyprctl", "dispatch", "hl.dsp.exit()")),
+    ("󰑓", "Restart", ("systemctl", "reboot")),
+    ("󰐥", "Shut down", ("systemctl", "poweroff")),
+)
+
+
+def battery():
+    for supply in sorted(Path("/sys/class/power_supply").glob("BAT*")):
+        try:
+            charge = (supply / "capacity").read_text().strip()
+            state = (supply / "status").read_text().strip()
+            return f"Battery {charge}% · {state}"
+        except OSError:
+            continue
+    return "Battery status unavailable"
+
+
+def main():
+    window = panel("Command Bridge Power", 450, 360)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+    window.add(root)
+    root.pack_start(heading("\ue906   COMMAND BRIDGE"), False, False, 0)
+    card = Gtk.Label(label=battery(), xalign=0)
+    card.get_style_context().add_class("destination")
+    root.pack_start(card, False, False, 0)
+
+    def activate(_, action, command):
+        if action != "Lock screen":
+            dialog = Gtk.MessageDialog(transient_for=window, modal=True,
+                                       message_type=Gtk.MessageType.QUESTION,
+                                       text=f"{action}?")
+            dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+            dialog.add_button(action, Gtk.ResponseType.OK)
+            dialog.set_default_response(Gtk.ResponseType.CANCEL)
+            answer = dialog.run()
+            dialog.destroy()
+            if answer != Gtk.ResponseType.OK:
+                return
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=4)
+            if command[0] == "hyprctl" and result.stdout.strip() != "ok":
+                card.set_text("Hyprland declined the logout request.")
+                return
+        except (OSError, subprocess.SubprocessError):
+            card.set_text(f"Could not {action.lower()}.")
+            return
+        window.close()
+
+    first = None
+    for icon, label, command in ACTIONS:
+        button = Gtk.Button(label=f"{icon}   {label}")
+        button.connect("clicked", activate, label, command)
+        root.pack_start(button, True, True, 0)
+        if first is None:
+            first = button
+    window.show_all()
+    first.grab_focus()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

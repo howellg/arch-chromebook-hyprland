@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 import gi
+from galactic_audio import muted, set_muted
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
@@ -89,6 +90,13 @@ class Settings(Gtk.Window):
         main.pack_start(status_grid,False,True,0)
         self.volume = self.slider(main, "󰕾  Volume", 100)
         self.brightness = self.slider(main, "󰃠  Brightness", 100)
+        cue_row = Gtk.Box(spacing=8)
+        cue_label = Gtk.Label(label="Galactic sound cues", xalign=0)
+        self.cue_switch = Gtk.Switch(active=not muted())
+        self.cue_switch.connect("state-set", self.toggle_cues)
+        cue_row.pack_start(cue_label, True, True, 0)
+        cue_row.pack_end(self.cue_switch, False, False, 0)
+        main.pack_start(cue_row, False, False, 0)
         info = Gtk.Label(label="Actions")
         info.get_style_context().add_class("section")
         info.set_xalign(0)
@@ -134,6 +142,10 @@ class Settings(Gtk.Window):
         self.refresh()
         self.show_all()
         GLib.timeout_add_seconds(10, self.refresh)
+
+    def toggle_cues(self, _switch, enabled):
+        set_muted(not enabled)
+        return False
 
     def slider(self, parent, label, max_value):
         text = Gtk.Label(label=label)

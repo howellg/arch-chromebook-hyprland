@@ -382,8 +382,11 @@ def launch():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 3 and sys.argv[1] == "--record":
+    if len(sys.argv) == 3 and sys.argv[1] in ("--record", "--record-priority"):
         record(sys.argv[2])
+        if sys.argv[1] == "--record-priority":
+            from galactic_audio import play
+            play("priority")
     elif sys.argv[1:] == ["--waybar"]:
         waybar()
     else:

@@ -2,6 +2,13 @@
 # Hyprland power menu, using Wofi. No system action is taken without a selection.
 set -euo pipefail
 
+selection_file="$HOME/.local/state/starwars-theme/selection"
+if [[ -r "$selection_file" && -x "$HOME/.local/bin/hypr-command-power" ]]; then
+    case "$(cat "$selection_file")" in
+        imperial|sith|rakatan) exec "$HOME/.local/bin/hypr-command-power" ;;
+    esac
+fi
+
 style="$HOME/.config/wofi/power.css"
 
 choose() {
