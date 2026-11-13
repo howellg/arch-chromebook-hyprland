@@ -11,14 +11,12 @@ sudo bash themes/starwars/grub/install.sh
 ```
 
 The installer uses GRUB, librsvg, and the JetBrains Mono Nerd Font installed
-on the Chromebook. It builds the theme, backs up the existing boot
-configuration under `/var/backups/grub-imperial.*`, and uses
-`/etc/default/grub.d/99-imperial-command.cfg` to select the theme. It validates
-the candidate menu before activating it and stops if the regenerated boot
-entries differ. Reboot to view the theme.
+on the Chromebook. It places the theme on the boot partition and loads it
+through a managed block in `/boot/grub/custom.cfg`. The existing generated
+boot menu and timeout stay in place. Reboot to view the theme.
 
-To revert a first installation, remove
-`/etc/default/grub.d/99-imperial-command.cfg` and restore `grub.cfg` from the
-backup directory printed by the installer. If the backup directory also
-contains `99-imperial-command.cfg`, restore that file to the drop-in path.
-The previous menu is usable with the unused theme assets still in place.
+To revert, restore `custom.cfg` from the backup directory printed by the
+installer. If the backup directory is empty, the installer created the file
+and you can remove `/boot/grub/custom.cfg` as root. If you have since added
+custom settings, remove only the lines from `# BEGIN Imperial Command theme`
+through `# END Imperial Command theme`.
