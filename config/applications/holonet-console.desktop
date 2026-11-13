@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=HoloNet Command Console
+Comment=Applications, study projects, system commands, and themed terminals
+Exec=@HOME@/.local/bin/hypr-holonet-launcher
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;
+Keywords=holonet;galactic;starwars;applications;projects;console;

@@ -10,6 +10,7 @@ import socket
 import subprocess as sp
 import sys
 import time
+from galactic_styles import waybar as galactic_waybar, waybar_config as galactic_waybar_config, quick as galactic_quick, lock as galactic_lock
 
 HOME=Path.home()
 STATE=HOME/".local/state/starwars-theme"
@@ -22,6 +23,7 @@ AWWW_DAEMON=("/usr/bin/awww-daemon" if Path("/usr/bin/awww-daemon").is_file() el
              str(HOME/".local/bin/awww-daemon") if (HOME/".local/bin/awww-daemon").is_file() else shutil.which("awww-daemon"))
 FILES={
     "waybar":"~/.config/waybar/style.css",
+    "waybar-config":"~/.config/waybar/config.jsonc",
     "launcher":"~/.config/wofi/launcher.css",
     "power":"~/.config/wofi/power.css",
     "cheatsheet":"~/.config/wofi/cheatsheet.css",
@@ -50,12 +52,14 @@ def run(*cmd,timeout=7):
 def save_originals():
     ORIG.mkdir(parents=True,exist_ok=True)
     manifest=ORIG/"manifest.json"
-    if manifest.exists():return
-    presence={}
+    presence=json.loads(manifest.read_text()) if manifest.exists() else {}
+    added=False
     for key in FILES:
+        if key in presence:continue
         src=path(key);presence[key]=src.is_file()
         if src.is_file():shutil.copy2(src,ORIG/key)
-    manifest.write_text(json.dumps(presence,indent=2)+"\n")
+        added=True
+    if added or not manifest.exists():manifest.write_text(json.dumps(presence,indent=2)+"\n")
 def atomic_write(target,content):
     target.parent.mkdir(parents=True,exist_ok=True)
     tmp=target.with_name(target.name+".sw-theme-tmp")
@@ -82,7 +86,7 @@ def restore():
         if m and Path(m.group(1)).is_file():restore_original_wallpaper(Path(m.group(1)))
     print("Restored original Catppuccin files. Shortcuts and workspace rules untouched.")
 
-def css_waybar(p):
+def css_waybar_legacy(p):
     b=base("waybar")
     return b+f"""
 /* STAR WARS / {p['label']} : original stylesheet stays in local backup */
@@ -123,7 +127,7 @@ window {{ background-color:alpha({p['bg']},0.95); border:2px solid {p['accent']}
 #text {{margin-left:9px;color:{p['text']};}}
 #img {{margin-right:8px;}}
 """
-def css_quick(p):
+def css_quick_legacy(p):
     return f"""/* {p['label']} • native GTK3 command console */
 window.quick-settings {{ background-color:alpha({p['bg']},0.97); color:{p['text']}; border:2px solid {p['accent']};border-radius:8px; }}
 window.quick-settings label {{color:{p['text']};font-family:"JetBrainsMono Nerd Font";}}
@@ -162,7 +166,7 @@ default-timeout=0
 [mode=do-not-disturb]
 invisible=1
 """
-def lock(p):
+def lock_legacy(p):
     b=base("lock")
     mapping={"rgb(17, 17, 27)":hexrgb(p['bg']),"rgb(205, 214, 244)":hexrgb(p['text']),"rgb(137, 180, 250)":hexrgb(p['accent']),"rgb(30, 30, 46)":hexrgb(p['card'])}
     for old,new in mapping.items():b=b.replace(old,new)
@@ -172,17 +176,19 @@ def hexrgb(color):
 def render(theme):
     p=THEMES[theme]
     for key,text in {
-        "waybar":css_waybar(p),"launcher":css_wofi(p,"launcher"),
+        "waybar":galactic_waybar(p,base("waybar")),
+        "waybar-config":galactic_waybar_config(base("waybar-config"),HOME),
+        "launcher":css_wofi(p,"launcher"),
         "power":css_wofi(p,"power"),"cheatsheet":css_wofi(p,"cheatsheet"),
-        "quick":css_quick(p),"mako":mako(p),
+        "quick":galactic_quick(p),"mako":mako(p),
         "kitty":base("kitty")+f"\n# Star Wars theme: {p['label']}\ncursor {p['accent']}\nactive_border_color {p['accent']}\n",
-        "lock":lock(p)}.items():atomic_write(path(key),text)
+        "lock":galactic_lock(p)}.items():atomic_write(path(key),text)
     return p
 def awww_ready():
     """Start the Arch-packaged user-level wallpaper daemon if available."""
     if not (AWWW and AWWW_DAEMON):
         return False
-    if run("awww","query")[0] == 0:
+    if run(AWWW,"query")[0] == 0:
         return True
     sp.Popen([AWWW_DAEMON,"--no-cache"],stdout=sp.DEVNULL,
              stderr=sp.DEVNULL,start_new_session=True)

@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""HoloNet console: safe app, recent project, and approved system launch menus."""
+from pathlib import Path
+import subprocess
+import sys
+import os
+
+HOME=Path.home()
+BIN=HOME/".local/bin"
+STYLE=HOME/".config/wofi/launcher.css"
+
+def launch(*args):
+    try:subprocess.Popen(args,start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    except OSError as exc:print(exc,file=sys.stderr)
+def choose(prompt,items,width=610,height=380):
+    if not items:return None
+    try:
+        proc=subprocess.run(["wofi","--dmenu","--no-custom-entry","--insensitive",
+                            "--prompt",prompt,"--width",str(width),"--height",str(height),
+                            "--style",str(STYLE)],input="\n".join(items)+"\n",text=True,
+                            capture_output=True,timeout=150)
+        return proc.stdout.strip() if proc.returncode==0 else None
+    except (OSError,subprocess.TimeoutExpired):return None
+
+def projects():
+    bases=[HOME/"Projects",HOME/"Documents"]
+    dirs=[]
+    for root in bases:
+        if not root.is_dir():continue
+        try:
+            for path in root.iterdir():
+                if path.is_dir() and not path.is_symlink() and not path.name.startswith("."):
+                    dirs.append(path)
+        except PermissionError:continue
+    dirs.sort(key=lambda p:p.stat().st_mtime if p.exists() else 0,reverse=True)
+    dirs=dirs[:24]
+    labels={f"󰉋  {p.name}  ·  {p.parent.name}":p for p in dirs}
+    selected=choose("HOLO-NET / PROJECT ARCHIVES",list(labels))
+    if not selected or selected not in labels:return
+    project=labels[selected]
+    action=choose("OPEN PROJECT / "+project.name,[
+       "󰨞  Open in VS Code","󰉋  Open in Files","  Open in Kitty"])
+    if action=="󰨞  Open in VS Code":launch("code",str(project))
+    elif action=="󰉋  Open in Files":launch("dolphin",str(project))
+    elif action=="  Open in Kitty":launch("kitty","-d",str(project))
+
+def system():
+    options={
+     "󰒓  Tactical Quick Settings":[str(BIN/"hypr-quick-settings")],
+     "󰀻  Classroom Center":[str(BIN/"hypr-classroom-center")],
+     "󰖩  Network Settings":["nm-connection-editor"],
+     "󰣀  Desktop Keybinds":[str(BIN/"hypr-keybinds")],
+     "󰩺  Syncthing Dashboard":["xdg-open","http://127.0.0.1:8384"],
+     "󰨞  Galactic Appearance":[str(BIN/"hypr-starwars"),"menu"],
+     "󰌾  Lock Screen":["loginctl","lock-session"]
+    }
+    selected=choose("HOLO-NET / SYSTEM CONSOLE",list(options))
+    if selected in options:launch(*options[selected])
+
+def terminals():
+    labels={"󰑁  Imperial Command":"imperial",
+            "󰞀  Sith Archives":"sith",
+            "󰃰  Rakatan Research":"rakatan"}
+    selected=choose("HOLO-NET / TERMINAL PROFILES",list(labels))
+    if selected in labels:launch(str(BIN/"hypr-galactic-terminal"),labels[selected])
+
+def main():
+    if "--test" in sys.argv:
+        print("HOLO-NET menu: apps, projects, system, terminal profiles, theme")
+        return
+    entries={
+      "󰀻  APPLICATIONS   /   Installed Programs":"apps",
+      "󰉋  PROJECTS       /   Recent Workspace Folders":"projects",
+      "󰒓  COMMAND       /   System Utilities":"system",
+      "  TERMINALS     /   Sith · Rakatan · Imperial":"terminals",
+      "󰍹  APPEARANCE    /   Galactic Themes":"theme"
+    }
+    selected=choose("HOLO-NET / COMMAND CONSOLE",list(entries),width=625,height=360)
+    action=entries.get(selected)
+    if action=="apps":launch(str(BIN/"hypr-app-launcher"))
+    elif action=="projects":projects()
+    elif action=="system":system()
+    elif action=="terminals":terminals()
+    elif action=="theme":launch(str(BIN/"hypr-starwars"),"menu")
+if __name__=="__main__":main()

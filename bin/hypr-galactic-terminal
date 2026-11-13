@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Launch distinct Kitty+Fish themes without replacing the existing Fish prompt."""
+from pathlib import Path
+import os
+import subprocess
+import sys
+HOME=Path.home()
+theme=(sys.argv[1] if len(sys.argv)>1 else "sith").lower()
+if theme not in ("imperial","sith","rakatan"):
+    raise SystemExit("Usage: hypr-galactic-terminal imperial|sith|rakatan")
+config=HOME/(".config/kitty/galactic-"+theme+".conf")
+if not config.is_file():raise SystemExit("Missing terminal preset: "+str(config))
+# Two Kitty config files merge: the explicit preset overrides background/colors
+# while preserving all other user settings. No global Fish prompt replacement.
+env=dict(os.environ,STARWARS_TERMINAL_PROFILE=theme)
+title={"imperial":"IMPERIAL COMMAND / TERMINAL","sith":"SITH ARCHIVES / TERMINAL",
+       "rakatan":"RAKATAN RESEARCH / TERMINAL"}[theme]
+command=["kitty","--class","galactic-"+theme,"--title",title,
+         "-c",str(HOME/".config/kitty/kitty.conf"),"-c",str(config),
+         "/usr/bin/fish","-C",str(HOME/".local/bin/hypr-galactic-greeting")]
+if "--print" in sys.argv:
+    print(" ".join(command))
+else:
+    subprocess.Popen(command,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)

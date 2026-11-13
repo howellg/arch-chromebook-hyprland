@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compact Catppuccin quick settings window for Chromebook / Hyprland."""
+"""Star Wars tactical settings console, preserving existing Chromebook controls."""
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +24,7 @@ def run(*args):
 
 class Settings(Gtk.Window):
     def __init__(self):
-        super().__init__(title="Chromebook · Quick Settings")
+        super().__init__(title="Galactic Command · Tactical Console")
         self.set_default_size(470, 700)
         self.set_resizable(True)
         self.set_border_width(16)
@@ -37,10 +37,14 @@ class Settings(Gtk.Window):
         viewport.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.add(viewport)
         viewport.add_with_viewport(main)
-        title = Gtk.Label(label="󰀻  Quick Settings")
+        title = Gtk.Label(label="󰀻  TACTICAL COMMAND CENTER")
         title.set_xalign(0)
         title.get_style_context().add_class("heading")
         main.pack_start(title, False, False, 0)
+        self.faction = Gtk.Label(label="IMPERIAL COMMAND  /  CONNECTED SYSTEMS")
+        self.faction.set_xalign(0)
+        self.faction.get_style_context().add_class("subtitle")
+        main.pack_start(self.faction,False,False,0)
         grid = Gtk.Grid(column_spacing=10, row_spacing=10)
         main.pack_start(grid, False, False, 0)
         self.wifi = Gtk.Button()
@@ -55,6 +59,21 @@ class Settings(Gtk.Window):
         self.bt.connect("clicked", self.toggle_bt)
         self.night.connect("clicked", self.toggle_night)
         self.profile.connect("clicked", self.cycle_profile)
+        self.status_title = Gtk.Label(label="TACTICAL OVERVIEW  /  SYSTEM TELEMETRY")
+        self.status_title.set_xalign(0)
+        self.status_title.get_style_context().add_class("section")
+        main.pack_start(self.status_title,False,False,0)
+        status_grid=Gtk.Grid(column_spacing=7,row_spacing=7)
+        self.status_tiles={}
+        for i,key in enumerate(("network","tailscale","syncthing","battery")):
+            cell=Gtk.Label(label="SCANNING...")
+            cell.set_xalign(0)
+            cell.set_line_wrap(True)
+            cell.get_style_context().add_class("status-card")
+            cell.set_size_request(190,48)
+            status_grid.attach(cell,i%2,i//2,1,1)
+            self.status_tiles[key]=cell
+        main.pack_start(status_grid,False,False,0)
         self.volume = self.slider(main, "󰕾  Volume", 100)
         self.brightness = self.slider(main, "󰃠  Brightness", 100)
         info = Gtk.Label(label="Actions")
@@ -74,6 +93,9 @@ class Settings(Gtk.Window):
             ("Maintenance", str(HOME / ".local/bin/hypr-maintenance")),
             ("Classroom", str(HOME / ".local/bin/hypr-classroom-center")),
             ("Galactic Theme", str(HOME / ".local/bin/hypr-starwars-menu")),
+            ("HoloNet Console", str(HOME / ".local/bin/hypr-holonet-launcher")),
+            ("Sith Terminal", str(HOME / ".local/bin/hypr-galactic-sith")),
+            ("Rakatan Terminal", str(HOME / ".local/bin/hypr-galactic-rakatan")),
             ("OCR Text", str(HOME / ".local/bin/hypr-classroom-ocr")),
             ("Backups", str(HOME / ".local/bin/hypr-classroom-backup")),
             ("First-Run", str(HOME / ".local/bin/hypr-first-run")),
@@ -131,7 +153,21 @@ class Settings(Gtk.Window):
         self.mute_changes = True
         active_mode = cmd(str(HOME / ".local/bin/hypr-desktop-mode"), "status") or "normal"
         self.mode_label.set_text(f"Desktop Modes · {active_mode.title()}")
+        try:
+            ws=(HOME/".local/state/starwars-theme/last-workspace").read_text().split()
+            sector=ws[0] if ws else "01"
+            theme=ws[1].upper() if len(ws)>1 else "IMPERIAL"
+        except OSError:
+            sector="01";theme="IMPERIAL"
+        self.faction.set_text(f"{theme} COMMAND  /  SECTOR {sector}  /  SYSTEMS ONLINE")
+        self.status_tiles["tailscale"].set_text("TAILSCALE  /  "+(cmd("systemctl","is-active","tailscaled") or "UNKNOWN").upper())
+        self.status_tiles["syncthing"].set_text("SYNCTHING  /  "+(cmd("systemctl","--user","is-active","syncthing") or "UNKNOWN").upper())
+        battery=HOME/".local/state/chromebook-classroom"
+        try: level=(Path("/sys/class/power_supply/BAT0/capacity").read_text().strip()+"%")
+        except OSError: level="N/A"
+        self.status_tiles["battery"].set_text("BATTERY  /  "+level)
         wifi = cmd("nmcli", "radio", "wifi").lower()
+        self.status_tiles["network"].set_text("NETWORK  /  "+("CONNECTED" if ":connected:" in cmd("nmcli","-t","-f","DEVICE,STATE,CONNECTION","device","status") else ("READY" if wifi=="enabled" else "OFFLINE")))
         self.wifi.set_label(f"󰤨  Wi-Fi\n{'Enabled' if wifi == 'enabled' else 'Disabled'}")
         bluetooth = cmd("bluetoothctl", "show")
         bt_on = "\tPowered: yes" in bluetooth or "\tPowered: yes" in bluetooth

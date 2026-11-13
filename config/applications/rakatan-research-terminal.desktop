@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Rakatan Research Terminal
+Comment=Cyan Legends-inspired Kitty and Fish terminal profile
+Exec=@HOME@/.local/bin/hypr-galactic-terminal rakatan
+Icon=utilities-terminal
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=rakatan;kitty;terminal;starwars;

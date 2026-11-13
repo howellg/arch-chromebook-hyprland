@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sith Archives Terminal
+Comment=Crimson Star Wars Kitty and Fish terminal profile
+Exec=@HOME@/.local/bin/hypr-galactic-terminal sith
+Icon=utilities-terminal
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=sith;kitty;terminal;starwars;

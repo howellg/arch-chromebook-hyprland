@@ -8,6 +8,7 @@ with tempfile.TemporaryDirectory(prefix="starwars-theme-isolated-") as dirname:
     config=home/".config"
     originals={
       "waybar/style.css":"/* CURRENT CATPPUCCIN */\n",
+      "waybar/config.jsonc":'{"modules-left":["custom/arch","hyprland/workspaces","hyprland/window"],"hyprland/workspaces":{"format-icons":{}}}\n',
       "wofi/launcher.css":"* { color: #cdd6f4; }\n",
       "mako/config":"font=JetBrainsMono Nerd Font 11\n",
       "hypr/hyprpaper.conf":"wallpaper {\n monitor =\n path = /not/here\n fit_mode = cover\n}\n"

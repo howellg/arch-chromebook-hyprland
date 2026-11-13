@@ -323,6 +323,8 @@ hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-clipboard")
 hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-quick-settings"))
 -- Galactic appearance menu: Imperial / Sith / Rakatan / original Catppuccin.
 hl.bind("SUPER + SHIFT + Y", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-starwars menu"))
+-- HoloNet Command Console; retains Super+Space as direct application search.
+hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-holonet-launcher"))
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-picker"))
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record start region"))
@@ -441,6 +443,23 @@ hl.window_rule({
     name = "terminal-workspace-2",
     match = { class = "^(kitty)$" },
     workspace = "2",
+})
+-- Explicit Galactic terminal profiles complement ordinary Kitty's workspace rule.
+for _, profile in ipairs({
+    { class = "galactic-sith", target = "2" },
+    { class = "galactic-rakatan", target = "3" },
+    { class = "galactic-imperial", target = "1" },
+}) do
+    hl.window_rule({
+        name = "galactic-" .. profile.target .. "-workspace",
+        match = { class = "^" .. profile.class .. "$" },
+        workspace = profile.target,
+    })
+end
+hl.window_rule({
+    name = "galactic-tactical-quick-settings",
+    match = { class = "^hypr-quick-settings$" },
+    float = true, center = true, size = "540 660",
 })
 hl.window_rule({
     name = "vscode-workspace-3",

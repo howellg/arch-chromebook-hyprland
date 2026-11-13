@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Single lightweight terminal welcome; user's fish_prompt stays untouched."""
+from os import getenv
+profiles={
+ "imperial":("IMPERIAL COMMAND","#ed6664","FLEET TERMINAL / READY"),
+ "sith":("SITH ARCHIVES","#ed4257","RESTRICTED RESEARCH / READY"),
+ "rakatan":("RAKATAN RESEARCH","#64d5df","STAR MAP ANALYSIS / READY")
+}
+name,color,sub=profiles.get(getenv("STARWARS_TERMINAL_PROFILE","imperial"),profiles["imperial"])
+code=tuple(int(color[i:i+2],16) for i in (1,3,5))
+print(f"\033[38;2;{code[0]};{code[1]};{code[2]}m"
+      f"╭──────────────────────────────────────────────╮\n"
+      f"│  {name:<42}  │\n"
+      f"│  {sub:<42}  │\n"
+      f"╰──────────────────────────────────────────────╯\033[0m")
+print("\033[90mUse galactic for theme commands. Your normal Fish prompt is preserved.\033[0m")

@@ -178,3 +178,9 @@ See [Galactic Appearance setup, tests and rollback](docs/STARWARS-THEME.md). Ins
 ### Wallpaper fit and seamless switching
 
 The six Star Wars wallpapers are now rendered for the Chromebook's **1920×1200 (16:10)** panel so the headings remain visible. **awww** provides a short fade between workspaces and prevents Hyprpaper's logo flash; the original Hyprpaper is automatically restored with Catppuccin. Hyprland's default logo is disabled, and Waybar is no longer fully reloaded during every workspace change. Install the optional managed backend on new Arch systems with `sudo pacman -S --needed awww` (otherwise the theme falls back to Hyprpaper). See [troubleshooting and recovery](docs/STARWARS-THEME.md).
+
+## Galactic Command Rice Suite
+
+Five integrated Star Wars-inspired workstation upgrades now ship as an optional theme layer: an event-driven Galactic Waybar with per-workspace sector status; a themed Imperial/Sith/Rakatan Hyprlock security terminal; the multi-category HoloNet launcher; floating tactical Quick Settings with live network/sync/battery status; and three distinct Kitty/Fish terminal profiles. **Super+Shift+O** opens HoloNet while **Super+Space** keeps direct application search. Sith and Rakatan profile terminals open on workspaces 2 and 3. No existing Fish prompt, ordinary Kitty keybind, or system control was removed.
+
+The Star Wars manager saves and restores the *original Waybar layout* as well as Catppuccin CSS and lock-screen settings. Read [full usage, testing, and rollback instructions](docs/GALACTIC-RICE-SUITE.md).
