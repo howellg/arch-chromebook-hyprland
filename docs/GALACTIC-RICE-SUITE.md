@@ -155,3 +155,17 @@ folder. Obsidian opens on Workspace 5, Imperial Databank, by default.
 Press **Super+Space** and search for **Arulia**, **DM vault**, or **Player vault**
 to open a registered Arulia vault in Obsidian. The launcher shows its
 Workspace 5 destination in the preview.
+
+## Imperial desktop controls
+
+Galactic Appearance enables the Imperial Targeting cursor, with an animated
+cog for busy states and resize brackets. Super+Shift+E opens Command Bridge
+Power. Suspend, logout, restart, and shutdown ask for confirmation.
+The Chromebook Overview key shows visible-window previews for the current
+workspace. Press the camera key (Print) to select a region with crimson
+brackets and a size readout, then choose Copy, Save, or Annotate. The
+direct-copy and direct-save shortcuts remain available.
+
+Priority alerts and workspace jumps through the Vault play short cues.
+Do Not Disturb silences the priority chirp. The Galactic sound cues switch
+in Tactical Quick Settings mutes both sounds.

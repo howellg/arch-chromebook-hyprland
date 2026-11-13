@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Select a region, then copy, save, or annotate the captured image."""
+from datetime import datetime
+from pathlib import Path
+import subprocess
+import sys
+
+from galactic_panel import Gdk, GLib, Gtk, heading, panel
+from gi.repository import GdkPixbuf
+
+
+def choose_region():
+    import gi
+    gi.require_version("GtkLayerShell", "0.1")
+    from gi.repository import GtkLayerShell as Layer
+
+    display = Gdk.Display.get_default()
+    windows = []
+    selection = None
+
+    def close():
+        for window in windows:
+            window.destroy()
+        Gtk.main_quit()
+
+    def add_overlay(monitor, keyboard):
+        nonlocal selection
+        window = Gtk.Window()
+        windows.append(window)
+        window.set_app_paintable(True)
+        window.set_visual(window.get_screen().get_rgba_visual())
+        Layer.init_for_window(window)
+        Layer.set_monitor(window, monitor)
+        Layer.set_layer(window, Layer.Layer.OVERLAY)
+        Layer.set_exclusive_zone(window, -1)
+        for edge in (Layer.Edge.LEFT, Layer.Edge.RIGHT, Layer.Edge.TOP, Layer.Edge.BOTTOM):
+            Layer.set_anchor(window, edge, True)
+        Layer.set_keyboard_mode(window, Layer.KeyboardMode.EXCLUSIVE if keyboard
+                                else Layer.KeyboardMode.NONE)
+        area = Gtk.DrawingArea()
+        window.add(area)
+        area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK |
+                        Gdk.EventMask.POINTER_MOTION_MASK)
+        start = end = None
+
+        def bounds():
+            x1, x2 = sorted((start[0], end[0]))
+            y1, y2 = sorted((start[1], end[1]))
+            return x1, y1, x2 - x1, y2 - y1
+
+        def draw(_, cr):
+            import cairo
+            w, h = area.get_allocated_width(), area.get_allocated_height()
+            cr.set_operator(cairo.OPERATOR_SOURCE)
+            cr.set_source_rgba(0.025, 0.03, 0.06, 0.65)
+            cr.paint()
+            if start is None:
+                cr.set_source_rgb(1, .85, .86)
+                cr.select_font_face("monospace")
+                cr.set_font_size(15)
+                cr.move_to(24, 32)
+                cr.show_text("Drag to capture · Esc to cancel")
+                return
+            x, y, width, height = bounds()
+            cr.set_operator(cairo.OPERATOR_CLEAR)
+            cr.rectangle(x, y, width, height)
+            cr.fill()
+            cr.set_operator(cairo.OPERATOR_OVER)
+            cr.set_source_rgb(1, .34, .40)
+            cr.set_line_width(2)
+            for cx, dx in ((x, 1), (x + width, -1)):
+                for cy, dy in ((y, 1), (y + height, -1)):
+                    cr.move_to(cx + dx * min(17, width / 2), cy)
+                    cr.line_to(cx, cy)
+                    cr.line_to(cx, cy + dy * min(17, height / 2))
+            cr.stroke()
+            cr.select_font_face("monospace")
+            cr.set_font_size(14)
+            tx, ty = min(x, max(0, w - 145)), max(0, y - 26)
+            cr.set_source_rgb(.09, .10, .15)
+            cr.rectangle(tx, ty, 145, 23)
+            cr.fill()
+            cr.set_source_rgb(1, .84, .85)
+            cr.move_to(tx + 8, ty + 16)
+            cr.show_text(f"{width} × {height}")
+
+        def press(_, event):
+            nonlocal start, end
+            if event.button == 1:
+                start = end = (int(event.x), int(event.y))
+                area.queue_draw()
+            elif event.button == 3:
+                close()
+
+        def move(_, event):
+            nonlocal end
+            if start is not None:
+                end = (max(0, min(int(event.x), area.get_allocated_width())),
+                       max(0, min(int(event.y), area.get_allocated_height())))
+                area.queue_draw()
+
+        def release(widget, event):
+            nonlocal selection
+            if start is None or event.button != 1:
+                return
+            move(widget, event)
+            x, y, width, height = bounds()
+            if width > 1 and height > 1:
+                geometry = monitor.get_geometry()
+                selection = f"{x + geometry.x},{y + geometry.y} {width}x{height}"
+            close()
+
+        area.connect("draw", draw)
+        area.connect("button-press-event", press)
+        area.connect("motion-notify-event", move)
+        area.connect("button-release-event", release)
+        window.connect("key-press-event", lambda _, event: close() if event.keyval == Gdk.KEY_Escape else False)
+        window.connect("realize", lambda widget: widget.get_window().set_cursor(
+            Gdk.Cursor.new_from_name(display, "crosshair")))
+        window.show_all()
+
+    monitors = [display.get_monitor(index) for index in range(display.get_n_monitors())]
+    if not monitors:
+        return None
+    for index, monitor in enumerate(monitors):
+        add_overlay(monitor, index == 0)
+    Gtk.main()
+    display.sync()
+    return selection
+
+
+def capture_actions(data):
+    window = panel("Imperial Capture", 480, 340)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+    window.add(root)
+    root.pack_start(heading("\ue905   IMPERIAL CAPTURE"), False, False, 0)
+    loader = GdkPixbuf.PixbufLoader.new_with_type("png")
+    loader.write(data)
+    loader.close()
+    pixbuf = loader.get_pixbuf()
+    width, height = pixbuf.get_width(), pixbuf.get_height()
+    scale = min(1, 445 / width, 215 / height)
+    preview = pixbuf.scale_simple(max(1, round(width * scale)), max(1, round(height * scale)),
+                                  GdkPixbuf.InterpType.BILINEAR)
+    root.pack_start(Gtk.Image.new_from_pixbuf(preview), True, True, 0)
+    status = Gtk.Label(label=f"{width} × {height} px", xalign=0, wrap=True)
+    root.pack_start(status, False, False, 0)
+    buttons = Gtk.Box(spacing=8)
+    root.pack_start(buttons, False, False, 0)
+
+    def action(_, name):
+        try:
+            if name == "Copy":
+                subprocess.run(["wl-copy", "--type", "image/png"], input=data, timeout=5, check=True)
+            elif name == "Save":
+                folder = Path.home() / "Pictures/Screenshots"
+                folder.mkdir(parents=True, exist_ok=True)
+                path = folder / f"Screenshot_{datetime.now():%Y-%m-%d_%H-%M-%S_%f}.png"
+                path.write_bytes(data)
+                subprocess.Popen(["notify-send", "-a", "Screenshot", "Region saved", str(path)])
+            else:
+                child = subprocess.Popen([str(Path(__file__).with_name("hypr-screenshot-edit")), "--stdin"],
+                                         stdin=subprocess.PIPE, start_new_session=True)
+                with child.stdin as stream:
+                    stream.write(data)
+            window.close()
+        except (OSError, subprocess.SubprocessError) as exc:
+            status.set_text(f"{name} failed · {exc}")
+
+    for name in ("Copy", "Save", "Annotate"):
+        button = Gtk.Button(label=name)
+        button.connect("clicked", action, name)
+        buttons.pack_start(button, True, True, 0)
+    window.show_all()
+    Gtk.main()
+
+
+def main():
+    if sys.argv[1:] == ["--preview-stdin"]:
+        capture_actions(sys.stdin.buffer.read())
+        return
+    try:
+        geometry = choose_region()
+    except (ValueError, ImportError):
+        selection = subprocess.run(["slurp", "-d", "-c", "#ff5766", "-b", "#070912aa"],
+                                   text=True, capture_output=True)
+        geometry = selection.stdout.strip() if selection.returncode == 0 else None
+    if geometry:
+        try:
+            data = subprocess.check_output(["grim", "-g", geometry, "-"], timeout=6)
+            capture_actions(data)
+        except (OSError, subprocess.SubprocessError, GLib.Error):
+            subprocess.run(["notify-send", "-a", "Screenshot", "Region capture failed"], check=False)
+
+
+if __name__ == "__main__":
+    main()

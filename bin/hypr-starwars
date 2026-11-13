@@ -78,6 +78,7 @@ def restore():
         elif dest.exists():dest.unlink()
     SELECTION.write_text("catppuccin\n")
     refresh_all()
+    restore_cursor()
     # Restore original Hyprland active border and matching wallpaper without a compositor restart.
     apply_border(["33ccffee","00ff99ee"],"595959aa",45)
     wallpaper=base("paper")
@@ -171,12 +172,15 @@ format=<b>%s</b>\\n<span foreground="{p['accent']}">%b</span>
 history=0
 on-notify=none
 [urgency=critical]
+on-notify=exec {shlex.quote(str(HOME / ".local/bin/hypr-notifications"))} --record-priority "$id"
 background-color=#2d151ffc
 border-color=#ff626a
 border-size=2
 default-timeout=0
 [mode=do-not-disturb]
 invisible=1
+[urgency=critical mode=do-not-disturb]
+on-notify=exec {shlex.quote(str(HOME / ".local/bin/hypr-notifications"))} --record "$id"
 """
 def lock_legacy(p):
     b=base("lock")
@@ -286,6 +290,27 @@ def apply_border(colors,inactive,angle):
         " } } }) end")
     rc,out,err=run("hyprctl","dispatch",expression)
     if rc!=0 or out!="ok":print("Border update failed:",out or err,file=sys.stderr)
+def apply_cursor():
+    cursor = "ImperialTargeting"
+    if not (HOME / ".local/share/icons" / cursor / "cursors/left_ptr").exists():
+        return
+    previous = STATE / "previous-cursor"
+    rc, current, _ = run("gsettings", "get", "org.gnome.desktop.interface", "cursor-theme")
+    if not previous.exists():
+        previous.write_text(current.strip("'") if rc == 0 else "default")
+    run("hyprctl", "setcursor", cursor, "24")
+    run("gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", cursor)
+
+
+def restore_cursor():
+    previous = STATE / "previous-cursor"
+    if previous.is_file():
+        cursor = previous.read_text().strip() or "default"
+        run("hyprctl", "setcursor", cursor, "24")
+        run("gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", cursor)
+        previous.unlink()
+
+
 def update_current(force=False):
     if not SELECTION.exists():return
     chosen=SELECTION.read_text().strip()
@@ -300,6 +325,7 @@ def update_current(force=False):
     accent = sector_accents.get(index, p["accent"][1:]) if chosen == "imperial" else p["accent"][1:]
     apply_border([accent+"ee"], "44465099", 0)
     wallpaper_apply(WALLS/(wall+".png"))
+    if force:apply_cursor()
     refresh_all(waybar=force)
     (STATE/"last-workspace").write_text(f"{index} {theme} {wall}\n")
 def choose(theme):

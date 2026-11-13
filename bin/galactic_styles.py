@@ -194,6 +194,13 @@ window.holonet-search .sector-icon {{
     font-family:"Galactic Sector";font-size:16px;color:{a};
 }}
 window.holonet-search .app-name {{font-weight:800;}}
+window.holonet-search button {{
+    background-image:none; background-color:{card}; color:{txt};
+    border:1px solid {edge}; border-radius:0 7px 0 7px; padding:7px 10px;
+}}
+window.holonet-search button:hover, window.holonet-search button:focus {{
+    border-color:{a}; background:alpha({a},.24);
+}}
 window.quick-settings levelbar block {{background-image:none;min-height:5px;border-radius:0;}}
 window.quick-settings levelbar block.filled {{background:{a};}}
 window.quick-settings levelbar block.empty {{background:{edge};}}

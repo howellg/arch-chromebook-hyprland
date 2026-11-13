@@ -393,7 +393,7 @@ hl.bind("XF86FullScreen", function()
 end)
 hl.bind("XF86LaunchA", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-overview-grid"))
 -- Chromebook screenshot key emits Print even though it is marked with a camera icon.
-hl.bind("Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-copy"))
+hl.bind("Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-panel"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-save"))
 hl.bind("CTRL + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot full-copy"))
 -- Open the fullscreen Sith Holocron Vault workspace picker.
@@ -456,6 +456,13 @@ for _, profile in ipairs({
         name = "galactic-" .. profile.target .. "-workspace",
         match = { class = "^" .. profile.class .. "$" },
         workspace = profile.target,
+    })
+end
+for _, class in ipairs({ "hypr-command-power", "hypr-overview-grid", "hypr-imperial-capture" }) do
+    hl.window_rule({
+        name = class .. "-panel",
+        match = { class = "^" .. class .. "$" },
+        float = true, center = true,
     })
 end
 hl.window_rule({

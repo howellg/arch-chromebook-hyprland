@@ -9,9 +9,16 @@ timestamp=$(date '+%Y-%m-%d_%H-%M-%S')
 filename="$dir/Screenshot_${timestamp}_$$.png"
 
 case "$mode" in
+    region-panel)
+        exec "$HOME/.local/bin/hypr-imperial-capture"
+        ;;
     region-copy|region-save)
         # On Escape, slurp exits nonzero; don't take or overwrite a screenshot.
-        geometry=$(slurp) || exit 0
+        if [[ $(cat "$HOME/.local/state/starwars-theme/selection" 2>/dev/null || :) =~ ^(imperial|sith|rakatan)$ ]]; then
+            geometry=$(slurp -d -c '#ff5766' -b '#070912aa') || exit 0
+        else
+            geometry=$(slurp) || exit 0
+        fi
         [[ -n "$geometry" ]] || exit 0
         if [[ "$mode" == region-copy ]]; then
             grim -g "$geometry" - | wl-copy --type image/png
@@ -28,7 +35,7 @@ case "$mode" in
         notify-send -a "Screenshot" "Screen saved" "$filename"
         ;;
     *)
-        printf 'Usage: %s {region-copy|region-save|full-copy|full-save}\n' "$0" >&2
+        printf 'Usage: %s {region-panel|region-copy|region-save|full-copy|full-save}\n' "$0" >&2
         exit 2
         ;;
 esac

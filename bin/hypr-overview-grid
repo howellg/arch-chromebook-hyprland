@@ -1,96 +1,101 @@
 #!/usr/bin/env python3
-"""GTK window switcher; thumbnails of visible windows only, no disk captures."""
+"""Show current-workspace windows and thumbnails captured before the panel opens."""
+from concurrent.futures import ThreadPoolExecutor
 import json
+import re
 import subprocess
 import sys
-import gi
-gi.require_version("Gtk","3.0")
-gi.require_version("GdkPixbuf","2.0")
-from gi.repository import Gtk, GdkPixbuf, Gdk
+
+from galactic_panel import Gtk, heading, panel
+from gi.repository import GLib, GdkPixbuf, Pango
+
 
 def run(*args):
-    try:return subprocess.run(args,capture_output=True,timeout=4)
-    except Exception:return None
-
-clients=run("hyprctl","clients","-j")
-if not clients or clients.returncode:
-    raise SystemExit("Could not read Hyprland windows.")
-windows=[w for w in json.loads(clients.stdout) if w.get("mapped",True)]
-active=run("hyprctl","activeworkspace","-j")
-wid=json.loads(active.stdout).get("id") if active and active.returncode==0 else None
-
-def shot(w):
-    if w.get("workspace",{}).get("id")!=wid:
-        return None
-    x,y=w.get("at",[0,0])
-    sw,sh=w.get("size",[0,0])
-    if sw<30 or sh<30:return None
-    # Capture only visible window pixels; never write screenshots to disk.
-    result=run("grim","-g",f"{sw}x{sh}+{x}+{y}","-t","png","-")
-    if not result or result.returncode or len(result.stdout)<100:return None
     try:
-        loader=GdkPixbuf.PixbufLoader.new_with_type("png")
-        loader.write(result.stdout);loader.close()
-        return loader.get_pixbuf().scale_simple(230,140,GdkPixbuf.InterpType.BILINEAR)
-    except Exception:return None
+        return subprocess.check_output(args, stderr=subprocess.DEVNULL, timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return b""
 
-class Overview(Gtk.Window):
-    def __init__(self):
-        super().__init__(title="Chromebook Window Overview")
-        self.set_default_size(855,570)
-        self.set_border_width(15)
-        self.connect("destroy",Gtk.main_quit)
-        self.connect("key-press-event",lambda _w,e:self.destroy() if e.keyval==Gdk.KEY_Escape else False)
-        self.set_position(Gtk.WindowPosition.CENTER)
-        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
-        self.add(root)
-        head=Gtk.Label(label="󰍹  Window Overview · select a window")
-        head.set_xalign(0)
-        root.pack_start(head,False,False,0)
-        scroll=Gtk.ScrolledWindow()
-        root.pack_start(scroll,True,True,0)
-        flow=Gtk.FlowBox()
-        flow.set_row_spacing(12)
-        flow.set_column_spacing(12)
-        flow.set_max_children_per_line(3)
-        flow.set_min_children_per_line(2)
-        flow.set_selection_mode(Gtk.SelectionMode.NONE)
-        scroll.add(flow)
-        for item in windows:
-            address=item.get("address","")
-            if not address.startswith("0x"):continue
-            box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=5)
-            preview=shot(item)
-            if preview:
-                box.pack_start(Gtk.Image.new_from_pixbuf(preview),False,False,0)
-            else:
-                icon=Gtk.Image.new_from_icon_name("application-x-executable",Gtk.IconSize.DIALOG)
-                icon.set_pixel_size(60)
-                box.pack_start(icon,True,True,0)
-            title=(item.get("title") or "(untitled)").replace("\n"," ")
-            cls=item.get("class") or "Application"
-            label=Gtk.Label(label=title[:29])
-            label.set_ellipsize(3)
-            box.pack_start(label,False,False,0)
-            ws=item.get("workspace",{}).get("name","?")
-            info=Gtk.Label(label=f"Workspace {ws} · {cls[:22]}")
-            info.get_style_context().add_class("dim-label")
-            box.pack_start(info,False,False,0)
-            btn=Gtk.Button()
-            btn.set_size_request(255,210)
-            btn.add(box)
-            btn.connect("clicked",self.focus,address)
-            flow.add(btn)
-        self.show_all()
 
-    def focus(self,_button,address):
-        subprocess.Popen(["hyprctl","dispatch",f'hl.dsp.focus({{ window = "address:{address}" }})'],
-                         stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        self.destroy()
+def workspace_windows():
+    active = json.loads(run("hyprctl", "activeworkspace", "-j") or b"{}")
+    windows = json.loads(run("hyprctl", "clients", "-j") or b"[]")
+    return [item for item in windows if item.get("mapped") and
+            item.get("workspace", {}).get("id") == active.get("id") and
+            re.fullmatch(r"0x[0-9a-f]+", item.get("address", "")) and
+            item.get("class") != "hypr-overview-grid"]
 
-if __name__=="__main__":
+
+def shot(item):
+    if not item.get("visible", not item.get("hidden")):
+        return b""
+    x, y = item["at"]
+    width, height = item["size"]
+    if min(width, height) < 30:
+        return b""
+    return run("grim", "-s", "0.45", "-l", "1", "-g", f"{x},{y} {width}x{height}", "-")
+
+
+def thumbnail(data):
+    if not data:
+        return None
+    try:
+        loader = GdkPixbuf.PixbufLoader.new_with_type("png")
+        loader.write(data)
+        loader.close()
+        pixbuf = loader.get_pixbuf()
+        scale = min(232 / pixbuf.get_width(), 130 / pixbuf.get_height())
+        return pixbuf.scale_simple(max(1, round(pixbuf.get_width() * scale)),
+                                   max(1, round(pixbuf.get_height() * scale)),
+                                   GdkPixbuf.InterpType.BILINEAR)
+    except GLib.Error:
+        return None
+
+
+def main():
+    windows = workspace_windows()
     if "--list" in sys.argv:
-        for w in windows:print(w.get("class"),w.get("workspace",{}).get("name"),w.get("title"))
+        for item in windows:
+            print(item["class"], item["workspace"]["name"], item["title"])
+        return
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        previews = list(pool.map(shot, windows))
+    window = panel("Tactical Window Overview", 820, 530)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    window.add(root)
+    root.pack_start(heading("\ue905   TACTICAL WINDOW OVERVIEW"), False, False, 0)
+    if not windows:
+        root.pack_start(Gtk.Label(label="No windows on this workspace"), True, True, 0)
     else:
-        Overview()
-        Gtk.main()
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        root.pack_start(scroll, True, True, 0)
+        flow = Gtk.FlowBox(row_spacing=8, column_spacing=8, max_children_per_line=3,
+                           selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START)
+        scroll.add(flow)
+
+        def focus(_, address):
+            subprocess.Popen(["hyprctl", "dispatch",
+                              f'hl.dsp.focus({{ window = "address:{address}" }})'])
+            window.close()
+
+        for item, data in zip(windows, previews):
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+            pixbuf = thumbnail(data)
+            preview = Gtk.Image.new_from_pixbuf(pixbuf) if pixbuf else (
+                Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.DIALOG))
+            preview.set_size_request(232, 134)
+            box.pack_start(preview, False, False, 0)
+            title = item.get("title") or item.get("class") or "Untitled"
+            label = Gtk.Label(label=title, ellipsize=Pango.EllipsizeMode.END, max_width_chars=29)
+            box.pack_start(label, False, False, 0)
+            button = Gtk.Button(tooltip_text=title)
+            button.add(box)
+            button.connect("clicked", focus, item["address"])
+            flow.add(button)
+    window.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

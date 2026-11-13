@@ -65,6 +65,9 @@ install -Dm644 "$repo/themes/starwars/GalacticSector.ttf" "$font"
 if command -v fc-cache >/dev/null; then
   fc-cache "$HOME/.local/share/fonts"
 fi
+if command -v rsvg-convert >/dev/null; then
+  python3 "$repo/themes/starwars/build_desktop_assets.py" || echo "Imperial cursor and sound generation failed."
+fi
 # Original Star Wars-inspired wallpapers are generated locally from SVG.
 # Do not auto-apply a faction theme: preserve the user's existing selection.
 if [[ -f "$repo/themes/starwars/generate_wallpapers.py" ]] && command -v rsvg-convert >/dev/null; then

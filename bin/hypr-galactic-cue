@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+import sys
+from galactic_audio import play
+
+if sys.argv[1:] == ["workspace"]:
+    play("workspace")

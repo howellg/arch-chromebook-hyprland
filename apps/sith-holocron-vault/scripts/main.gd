@@ -100,6 +100,8 @@ func _activate(id: int) -> void:
     var switched: bool = HyprBridge.switch_to(id)
     if switched:
         HyprBridge.remember(id)
+        if id != active_workspace:
+            OS.create_process(OS.get_environment("HOME").path_join(".local/bin/hypr-galactic-cue"), ["workspace"])
     else:
         push_warning("Hyprland refused workspace switch: %d" % id)
     get_tree().quit()
