@@ -68,6 +68,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("@HOME@/.local/bin/hypr-night-light")
     -- Start wallpaper service only after choosing a wallpaper.
     hl.exec_cmd("sh -c 'test ! -s @HOME@/.config/hypr/hyprpaper.conf || exec hyprpaper'")
+    -- Reversible Star Wars theme watcher. No changes when Catppuccin is selected.
+    hl.exec_cmd("@HOME@/.local/bin/hypr-starwars watch")
 end)
 
 
@@ -319,6 +321,8 @@ hl.bind("SUPER + SHIFT + N", hl.dsp.exec_cmd("makoctl mode -t do-not-disturb"))
 hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-clipboard"))
 -- Chromebook-specific utilities; no function keys needed.
 hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-quick-settings"))
+-- Galactic appearance menu: Imperial / Sith / Rakatan / original Catppuccin.
+hl.bind("SUPER + SHIFT + Y", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-starwars menu"))
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-picker"))
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record start region"))

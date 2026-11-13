@@ -163,3 +163,14 @@ See [Desktop Integrations](docs/INTEGRATIONS.md) for setup, privacy, limitations
 ## Classroom Center (November 2026)
 
 A dedicated **Chromebook Classroom Center** now combines automatic battery optimization, local config/coursework backup and safe restore, campus Wi-Fi diagnostics, a study task board and 25-minute timer, post-suspend network checks, screenshot OCR, safe Arch update information, and Syncthing/Tailscale status. Search in Wofi or open Quick Settings → **Classroom**. The installer creates a desktop entry in `~/.local/share/applications` and enables the daily config-backup timer. Syncthing may be enabled separately; Tailscale requires privileged service startup and authentication. See [Classroom Center](docs/CLASSROOM.md) for full commands, limitations, and test results.
+
+## Star Wars / Galactic Appearance
+
+The optional **Galactic Appearance** theme adds original Imperial Command, Sith Archives, and Rakatan Research artwork (Episodes I–VI and Legends visual influences only), an Imperial hybrid with workspace-specific color palettes and backgrounds, and a one-click restoration of your original Catppuccin styling. It preserves existing Hyprland workspaces, shortcuts, application rules, service configuration and classroom utilities.
+
+- **Super+Shift+Y** opens the theme switcher (also available via Wofi search or Quick Settings → Galactic Theme).
+- Workspaces **1 / 2 / 3** use Imperial / Sith / Rakatan styling; **4 / 5 / 9** use Fleet Communications / Databank / Command Bridge backgrounds.
+- The selector can also apply Sith or Rakatan globally, or fully restore original Catppuccin style files.
+- Wallpapers are locally generated from original SVGs without downloading copyrighted images. Movement uses the existing Hyprland animations rather than battery-hungry video wallpapers.
+
+See [Galactic Appearance setup, tests and rollback](docs/STARWARS-THEME.md). Installation requires `rsvg-convert` (librsvg) to generate wallpapers; the installer does not force a theme change.

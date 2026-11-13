@@ -73,6 +73,7 @@ class Settings(Gtk.Window):
             ("Displays", str(HOME / ".local/bin/hypr-displays")),
             ("Maintenance", str(HOME / ".local/bin/hypr-maintenance")),
             ("Classroom", str(HOME / ".local/bin/hypr-classroom-center")),
+            ("Galactic Theme", str(HOME / ".local/bin/hypr-starwars-menu")),
             ("OCR Text", str(HOME / ".local/bin/hypr-classroom-ocr")),
             ("Backups", str(HOME / ".local/bin/hypr-classroom-backup")),
             ("First-Run", str(HOME / ".local/bin/hypr-first-run")),

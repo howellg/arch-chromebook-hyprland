@@ -59,6 +59,11 @@ if [[ "$dryrun" == 1 ]]; then
 fi
 echo "Installed $copies files, skipped $skips."
 [[ -d "$backup" ]] && echo "Backup directory: $backup"
+# Original Star Wars-inspired wallpapers are generated locally from SVG.
+# Do not auto-apply a faction theme: preserve the user's existing selection.
+if [[ -f "$repo/themes/starwars/generate_wallpapers.py" ]] && command -v rsvg-convert >/dev/null; then
+  python3 "$repo/themes/starwars/generate_wallpapers.py" || echo "Wallpaper generation failed; Catppuccin remains available."
+fi
 mkdir -p "$HOME/.config/chromebook"
 printf "%s\n" "$repo" > "$HOME/.config/chromebook/repository-path"
 

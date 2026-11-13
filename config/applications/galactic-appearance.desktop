@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Galactic Appearance
+GenericName=Star Wars Theme Switcher
+Comment=Switch Imperial, Sith, Rakatan or restore Catppuccin
+Exec=@HOME@/.local/bin/hypr-starwars menu
+Icon=preferences-desktop-theme
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=starwars;sith;empire;rakatan;theme;catppuccin;
