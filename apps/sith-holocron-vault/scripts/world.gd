@@ -352,21 +352,27 @@ func set_mode(value: String) -> void:
     map_root.visible = value == "map"
     tactical_root.visible = value == "table"
 
+var focus_pulse := 0.0
+
 func update_scene(delta: float, focus: int) -> void:
     clock += delta
     if active_id != focus:
         active_id = focus
+        focus_pulse = 1.0
         for id in IDS:
+            pedestal_lights[id].light_color = HyprBridge.TINTS[id]
             pedestal_lights[id].light_energy = 1.1 if id == focus else .13
             map_routes[id].emission_energy_multiplier = 1.8 if id == focus else .18
+    focus_pulse = move_toward(focus_pulse, 0.0, delta * 2.2)
     if mode == "vault":
+        pedestal_lights[focus].light_color = HyprBridge.TINTS[focus].lerp(Color("#f34361"), focus_pulse)
+        pedestal_lights[focus].light_energy = 1.1 + focus_pulse * 1.25
         for i in range(6):
             var slot: int = IDS[i]
             var item: Node3D = gems[slot]
-            var base: Vector3 = STATIONS[i]
             var desired_height: float = 2.65 + sin(clock * 1.0 + float(i)) * .11
             if slot == focus:
-                desired_height += .45
+                desired_height += .45 + focus_pulse * .24
             item.position.y = lerpf(item.position.y, desired_height, minf(1, delta * 7.0))
             item.rotation.y += delta * (0.42 if slot == focus else 0.11)
             var desired_scale: float = 1.16 if slot == focus else .94

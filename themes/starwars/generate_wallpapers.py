@@ -10,7 +10,6 @@ OUT.mkdir(parents=True,exist_ok=True)
 W,H=1920,1200
 SCENES={
  "imperial":("#080e18","#18243a","#ea6260","#92a3b8","IMPERIAL COMMAND","SECTOR ONE • CORUSCANT"),
- "rakatan":("#071623","#0a3042","#58d4e6","#d5aa61","RAKATAN RESEARCH","ANCIENT SYSTEM • STAR FORGE"),
  "databank":("#11121a","#292523","#d6af6a","#95abb8","IMPERIAL DATABANK","RECORDS • SECURE ACCESS"),
  "comms":("#0b1524","#223146","#8ab9d2","#d3a47b","FLEET COMMUNICATIONS","HOLO-NET • ONLINE"),
 }
@@ -47,7 +46,7 @@ def svg(name,palette):
 <text x="1460" y="1132" font-size="16" letter-spacing="3" fill="{accent}">SECURE TERMINAL</text></g>
 <g fill="{accent}" opacity=".48"><rect x="150" y="625" width="440" height="3"/>{bars}</g></svg>'''
 def main():
-    for name in (*SCENES, "sith", "bridge"):
+    for name in (*SCENES, "sith", "bridge", "rakatan"):
         source=ROOT/(name+".svg")
         if name in SCENES:
             source.write_text(svg(name, SCENES[name]))

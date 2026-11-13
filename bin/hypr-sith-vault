@@ -26,4 +26,9 @@ exec 9>"$HOME/.local/state/sith-vault/instance.lock"
 if ! flock -n 9; then
   exit 0
 fi
+# Capture before the fullscreen window covers the desktop. Keep pixels in memory.
+if [[ " $* " != *" --headless "* && " $* " != *" --self-test "* ]]; then
+  VAULT_PREVIEW="$(python3 "$project/capture-preview.py" 2>/dev/null || true)"
+  export VAULT_PREVIEW
+fi
 exec "$engine" --path "$project" --rendering-method gl_compatibility --fullscreen "$@"

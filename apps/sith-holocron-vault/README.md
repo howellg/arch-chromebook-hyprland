@@ -84,3 +84,8 @@ The launcher requests fullscreen. For windowed preview, launch with `--windowed`
 - Data-driven UI: `scripts/hud.gd`
 - KOTOR / SWTOR-inspired, not a recreation of a commercial game scene.
 - The app exits as soon as a workspace is chosen, keeping continuous GPU use at zero when closed.
+
+The workspace dossier shows window titles and app-type icons. The launcher
+captures one small preview of the focused window before opening fullscreen,
+when the compositor can supply its visible pixels. Preview pixels stay in
+memory. Workspaces without a matching capture show their window list.

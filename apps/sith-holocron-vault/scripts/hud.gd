@@ -14,9 +14,13 @@ var mode_labels: Dictionary = {}
 var number: Label
 var name_label: Label
 var planet: Label
-var application: Label
 var count_label: Label
-var windows_label: Label
+var rows: Array[Label] = []
+var row_icons: Array[Label] = []
+var thumbnail: TextureRect
+var thumbnail_hint: Label
+var preview_address := ""
+var preview_texture: Texture2D
 var status_label: Label
 var sector_buttons: Dictionary = {}
 var focus_color: Color = Color("#ed405d")
@@ -79,29 +83,63 @@ func _build_data_panel() -> void:
     panel.offset_left = -312
     panel.offset_right = -28
     var marker := Color("#8da0b7")
-    _text(panel, "ACTIVE ARCHIVE NODE", 14, marker, Vector2(18, 18), Vector2(280, 23))
-    number = _text(panel, "02", 48, focus_color, Vector2(18, 50), Vector2(120, 65))
-    name_label = _text(panel, "SITH ARCHIVES", 21, Color("#f7e4e9"),
-        Vector2(20, 119), Vector2(250, 38))
-    planet = _text(panel, "KORRIBAN  /  LEGENDS SECTOR", 14,
-        Color("#d6a2aa"), Vector2(20, 163), Vector2(282, 26))
-    var rule := ColorRect.new()
-    rule.color = Color("#5b3c4c")
-    rule.position = Vector2(20, 203)
-    rule.size = Vector2(244, 2)
-    panel.add_child(rule)
-    _text(panel, "ASSIGNED SYSTEM", 13, marker, Vector2(20, 219), Vector2(267, 25))
-    application = _text(panel, "Kitty / Terminal", 18, Color("#e0e5ec"),
-        Vector2(20, 247), Vector2(284, 28))
-    _text(panel, "LIVE WORKSPACE DATA", 13, marker,
-        Vector2(20, 294), Vector2(268, 25))
-    count_label = _text(panel, "SCANNING...", 15, Color("#e7c3c9"),
-        Vector2(20, 321), Vector2(276, 27))
-    windows_label = _text(panel, "Checking Hyprland...", 13,
-        Color("#bbc7d5"), Vector2(20, 350), Vector2(244, 76))
-    windows_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    status_label = _text(panel, "SELECT AN ARCHIVE TO VIEW DETAILS", 12,
-        Color("#7fe3e0"), Vector2(20, 430), Vector2(280, 22))
+    _text(panel, "WORKSPACE DOSSIER", 13, marker, Vector2(18, 14), Vector2(247, 24))
+    number = _text(panel, "", 30, focus_color, Vector2(18, 44), Vector2(55, 42))
+    name_label = _text(panel, "", 16, Color("#f7e4e9"), Vector2(77, 45), Vector2(189, 34))
+    planet = _text(panel, "", 12, Color("#d6a2aa"), Vector2(20, 88), Vector2(244, 22))
+
+    var frame := Panel.new()
+    frame.position = Vector2(20, 119)
+    frame.size = Vector2(244, 137)
+    frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    frame.add_theme_stylebox_override("panel", _skin(Color("#583a51"), Color("#10131e")))
+    panel.add_child(frame)
+    thumbnail = TextureRect.new()
+    thumbnail.position = Vector2(2, 2)
+    thumbnail.size = Vector2(240, 133)
+    thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    thumbnail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    frame.add_child(thumbnail)
+    thumbnail_hint = _text(frame, "", 12, marker, Vector2(0, 0), frame.size)
+    thumbnail_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    thumbnail_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+    count_label = _text(panel, "", 14, Color("#e7c3c9"), Vector2(20, 266), Vector2(244, 24))
+    var icon_font := SystemFont.new()
+    icon_font.font_names = PackedStringArray(["JetBrainsMono Nerd Font"])
+    for i in range(4):
+        var y: float = 299 + i * 27
+        var icon := _text(panel, "", 15, marker, Vector2(20, y), Vector2(26, 24))
+        icon.add_theme_font_override("font", icon_font)
+        row_icons.append(icon)
+        var title := _text(panel, "", 13, Color("#bbc7d5"), Vector2(47, y), Vector2(216, 24))
+        title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        rows.append(title)
+    status_label = _text(panel, "", 12, Color("#7fe5e0"), Vector2(20, 430), Vector2(244, 22))
+
+func load_preview(payload: String) -> void:
+    var parts := payload.split(":", false, 1)
+    if parts.size() != 2:
+        return
+    var image := Image.new()
+    if image.load_jpg_from_buffer(Marshalls.base64_to_raw(parts[1])) == OK:
+        preview_address = parts[0]
+        preview_texture = ImageTexture.create_from_image(image)
+
+func _app_icon(app_class: String) -> String:
+    var name := app_class.to_lower()
+    if name.contains("firefox") or name.contains("chromium"):
+        return "󰈹"
+    if name.contains("kitty") or name.contains("terminal"):
+        return ""
+    if name.contains("code"):
+        return "󰨞"
+    if name.contains("discord"):
+        return "󰙯"
+    if name.contains("dolphin") or name.contains("thunar"):
+        return ""
+    return "󰖲"
 
 func _button(parent: Control, text: String, x: float, y: float, w: float, h: float, action: Callable) -> Button:
     var b := Button.new()
@@ -163,21 +201,27 @@ func display(selected: int, mode: String, records: Dictionary, current: int) -> 
     number.add_theme_color_override("font_color", focus_color)
     name_label.text = str(HyprBridge.NAMES[selected])
     planet.text = str(HyprBridge.PLANETS[selected]) + "  /  ARCHIVE SECTOR"
-    application.text = str(HyprBridge.APPS[selected])
-    var entry: Dictionary = records.get(selected, {"count": 0, "windows": []})
-    var count: int = int(entry.get("count", 0))
-    count_label.text = "%d ACTIVE WINDOW%s" % [count, "" if count == 1 else "S"]
-    var titles: Array = entry.get("windows", [])
-    if titles.is_empty():
-        windows_label.text = "EMPTY SECTOR\nReady for new programs"
-    else:
-        var strings: Array[String] = []
-        for i in range(mini(titles.size(), 3)):
-            var value: String = str(titles[i])
-            strings.append("• " + value.substr(0, 38))
-        if titles.size() > 3:
-            strings.append("• +%d more" % (titles.size() - 3))
-        windows_label.text = "\n".join(strings)
+    var entry: Dictionary = records.get(selected, {})
+    var clients: Array = entry.get("clients", [])
+    var count := clients.size()
+    count_label.text = "NO OPEN WINDOWS" if count == 0 else "%d OPEN WINDOW%s" % [count, "" if count == 1 else "S"]
+    thumbnail.texture = null
+    thumbnail_hint.text = "EMPTY SECTOR" if count == 0 else "NO VISIBLE PREVIEW"
+    for client in clients:
+        if client["address"] == preview_address and preview_texture:
+            thumbnail.texture = preview_texture
+            thumbnail_hint.text = ""
+            break
+    for i in range(rows.size()):
+        rows[i].text = ""
+        row_icons[i].text = ""
+        if i >= count:
+            continue
+        if i == rows.size() - 1 and count > rows.size():
+            rows[i].text = "+%d more windows" % (count - i)
+        else:
+            rows[i].text = clients[i]["title"]
+            row_icons[i].text = _app_icon(clients[i]["class"])
     status_label.text = "CURRENT DESKTOP" if current == selected else "PRESS ENTER TO ACCESS"
     heading.text = {"vault": "SITH  /  HOLOCRON VAULT", "map": "RAKATAN  /  STAR MAP",
         "table": "IMPERIAL  /  HOLOTABLE"}.get(mode, "SITH  /  HOLOCRON VAULT")
