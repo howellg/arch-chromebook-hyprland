@@ -117,3 +117,12 @@ Mako uses a comms-dish glyph and the active faction accent. Critical alerts
 use a brighter red. The volume and brightness keys show ten-segment meters
 with exact percentages, and repeat presses replace the corresponding popup.
 Media control popups stay out of notification history in Galactic themes.
+
+## Fleet Communications log
+
+Open with **Super+Shift+H**, from Tactical Quick Settings, or by
+right-clicking Waybar's notification control. Search active and recent Mako
+notifications, spot priority transmissions, and manage Do Not Disturb and
+scheduled quiet hours. Galactic themes record arrival times for new
+notifications in the session runtime directory. Earlier entries remain
+readable. Volume and brightness popups are excluded from the log.

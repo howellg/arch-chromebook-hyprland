@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import signal
 import socket
 import subprocess as sp
@@ -160,6 +161,7 @@ ignore-timeout=0
 icons=1
 max-icon-size=36
 markup=1
+on-notify=exec {shlex.quote(str(HOME / ".local/bin/hypr-notifications"))} --record "$id"
 format=<span font_family="Galactic Sector" foreground="{p['accent']}">\ue904</span>  <span foreground="{p['muted']}">%a</span>\\n<b>%s</b>\\n%b
 [grouped]
 format=<span font_family="Galactic Sector" foreground="{p['accent']}">\ue904</span>  <span foreground="{p['muted']}">%a · %g</span>\\n<b>%s</b>\\n%b
@@ -167,6 +169,7 @@ format=<span font_family="Galactic Sector" foreground="{p['accent']}">\ue904</sp
 background-color={p['bg']}fa
 format=<b>%s</b>\\n<span foreground="{p['accent']}">%b</span>
 history=0
+on-notify=none
 [urgency=critical]
 background-color=#2d151ffc
 border-color=#ff626a
