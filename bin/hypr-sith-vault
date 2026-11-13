@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch original 3D Sith Vault without replacing Super+Tab's window overview.
+# Launch the fullscreen 3D Sith Holocron Vault.
 set -euo pipefail
 repo="$HOME/Projects/arch-chromebook-hyprland"
 if [[ -f "$HOME/.config/chromebook/repository-path" ]]; then
@@ -26,4 +26,4 @@ exec 9>"$HOME/.local/state/sith-vault/instance.lock"
 if ! flock -n 9; then
   exit 0
 fi
-exec "$engine" --path "$project" --rendering-method gl_compatibility "$@"
+exec "$engine" --path "$project" --rendering-method gl_compatibility --fullscreen "$@"

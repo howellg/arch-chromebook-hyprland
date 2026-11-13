@@ -10,7 +10,7 @@ The design aims for a stylized *KOTOR remade with around-2012 graphical fidelity
 - **G — Rakatan Star Map:** 3D planets connected by cyan hyperspace routes.
 - **I — Imperial Holotable:** Command-center display with six tactical sectors.
 
-The original Hyprland **Super+Tab** window overview is deliberately preserved. Open this picker separately with **Super+Shift+J** or search **Sith Holocron Vault** using the normal application launcher.
+Open the Vault with **Super+Tab** or **Super+Shift+J**, or search **Sith Holocron Vault** in the application launcher. The Chromebook’s physical Overview key opens the GTK window grid.
 
 ## Controls
 
@@ -62,7 +62,7 @@ godot --editor --path ~/Projects/arch-chromebook-hyprland/apps/sith-holocron-vau
 
 If using portable Godot instead, pass the same `--editor --path` arguments to the portable executable. The project's `.godot/` generated import cache is ignored by Git.
 
-The included desktop entry is `config/applications/sith-holocron-vault.desktop`; the launcher wrapper is `bin/hypr-sith-vault`. The repository install script installs these like other desktop utilities. It does **not** automatically replace the original overview.
+The included desktop entry is `config/applications/sith-holocron-vault.desktop`; the launcher wrapper is `bin/hypr-sith-vault`. The repository install script installs these like other desktop utilities. The Hyprland configuration binds **Super+Tab** to the Vault.
 
 ## Tests
 
@@ -74,7 +74,7 @@ godot --headless --path apps/sith-holocron-vault --script res://tests/test_bridg
 
 The self-test validates scene construction, all three views, focus selection, and local Hyprland data. It never changes the user's workspace. Real GUI rendering on the Chromebook's Intel Iris Xe was tested for the Sith chamber, Star Map, and Holotable. Temporary preview screenshots were stored only under `~/.local/state/sith-vault/`, not committed.
 
-The GUI was confirmed in Hyprland with the window class `Sith Holocron Vault`, floating and centered at 1160×700. Existing apps, MySQL, Syncthing, Tailscale, and Super+Tab were not changed.
+The launcher requests fullscreen. For windowed preview, launch with `--windowed`. The Holotable shows exact window counts on its workspace buttons, with up to six lit indicators per sector. HoloNet’s Recent Workspaces menu uses destinations successfully selected in the Vault and stores only workspace IDs.
 
 ## Notes
 

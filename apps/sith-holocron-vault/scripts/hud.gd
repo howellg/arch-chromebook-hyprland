@@ -48,7 +48,7 @@ func _skin(color: Color, backdrop: Color, thickness: int = 1) -> StyleBoxFlat:
 func _place(node: Control, x: float, y: float, w: float, h: float) -> void:
     node.position = Vector2(x, y)
     node.size = Vector2(w, h)
-    node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    node.mouse_filter = Control.MOUSE_FILTER_STOP
     root.add_child(node)
 
 func _text(parent: Control, message: String, font_size: int, color: Color, pos: Vector2, area: Vector2) -> Label:
@@ -74,18 +74,21 @@ func _build_heading() -> void:
 func _build_data_panel() -> void:
     var panel := Panel.new()
     panel.add_theme_stylebox_override("panel", _skin(Color("#9c394d"), Color(0.045, 0.060, 0.087, .93), 2))
-    _place(panel, 850, 136, 318, 468)
+    _place(panel, 888, 136, 284, 468)
+    panel.set_anchors_preset(Control.PRESET_TOP_RIGHT, true)
+    panel.offset_left = -312
+    panel.offset_right = -28
     var marker := Color("#8da0b7")
     _text(panel, "ACTIVE ARCHIVE NODE", 14, marker, Vector2(18, 18), Vector2(280, 23))
     number = _text(panel, "02", 48, focus_color, Vector2(18, 50), Vector2(120, 65))
-    name_label = _text(panel, "SITH ARCHIVES", 24, Color("#f7e4e9"),
-        Vector2(20, 119), Vector2(282, 38))
+    name_label = _text(panel, "SITH ARCHIVES", 21, Color("#f7e4e9"),
+        Vector2(20, 119), Vector2(250, 38))
     planet = _text(panel, "KORRIBAN  /  LEGENDS SECTOR", 14,
         Color("#d6a2aa"), Vector2(20, 163), Vector2(282, 26))
     var rule := ColorRect.new()
     rule.color = Color("#5b3c4c")
     rule.position = Vector2(20, 203)
-    rule.size = Vector2(276, 2)
+    rule.size = Vector2(244, 2)
     panel.add_child(rule)
     _text(panel, "ASSIGNED SYSTEM", 13, marker, Vector2(20, 219), Vector2(267, 25))
     application = _text(panel, "Kitty / Terminal", 18, Color("#e0e5ec"),
@@ -95,13 +98,14 @@ func _build_data_panel() -> void:
     count_label = _text(panel, "SCANNING...", 15, Color("#e7c3c9"),
         Vector2(20, 321), Vector2(276, 27))
     windows_label = _text(panel, "Checking Hyprland...", 13,
-        Color("#bbc7d5"), Vector2(20, 350), Vector2(275, 76))
+        Color("#bbc7d5"), Vector2(20, 350), Vector2(244, 76))
     windows_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     status_label = _text(panel, "SELECT AN ARCHIVE TO VIEW DETAILS", 12,
         Color("#7fe3e0"), Vector2(20, 430), Vector2(280, 22))
 
 func _button(parent: Control, text: String, x: float, y: float, w: float, h: float, action: Callable) -> Button:
     var b := Button.new()
+    b.clip_text = true
     b.text = text
     b.position = Vector2(x, y)
     b.size = Vector2(w, h)
@@ -121,19 +125,26 @@ func _button(parent: Control, text: String, x: float, y: float, w: float, h: flo
 func _build_sector_buttons() -> void:
     var strip := Panel.new()
     strip.add_theme_stylebox_override("panel", _skin(Color("#3b3b4a"), Color(0.04, 0.055, 0.080, .93)))
-    _place(strip, 28, 626, 1140, 77)
+    _place(strip, 28, 622, 1144, 77)
+    strip.set_anchors_preset(Control.PRESET_BOTTOM_LEFT, true)
+    strip.offset_top = -128
+    strip.offset_bottom = -51
     for idx in range(HyprBridge.WORKSPACES.size()):
         var id: int = HyprBridge.WORKSPACES[idx]
-        var label: String = "%02d  %s" % [id, str(HyprBridge.NAMES[id])]
+        var label: String = "%02d  %s" % [id, HyprBridge.NAMES[id]]
         var b: Button = _button(strip, label, 11 + idx * 187, 14, 178, 47,
             func() -> void: activate_requested.emit(id))
+        b.add_theme_font_size_override("font_size", 12)
         b.mouse_entered.connect(func() -> void: select_requested.emit(id))
         sector_buttons[id] = b
 
 func _build_bottom_bar() -> void:
     var info := Panel.new()
     info.add_theme_stylebox_override("panel", _skin(Color("#455061"), Color(0.03, 0.042, 0.064, .93)))
-    _place(info, 28, 712, 1140, 36)
+    _place(info, 28, 708, 1144, 36)
+    info.set_anchors_preset(Control.PRESET_BOTTOM_LEFT, true)
+    info.offset_top = -42
+    info.offset_bottom = -6
     _text(info, "← → ↑ ↓  FOCUS     1–5 / 9  SELECT     ENTER  ACCESS     ESC  EXIT",
         12, Color("#c2d0d8"), Vector2(12, 6), Vector2(760, 26))
     var views := ["S  VAULT", "G  STAR MAP", "I  HOLOTABLE"]
@@ -170,13 +181,19 @@ func display(selected: int, mode: String, records: Dictionary, current: int) -> 
     status_label.text = "CURRENT DESKTOP" if current == selected else "PRESS ENTER TO ACCESS"
     heading.text = {"vault": "SITH  /  HOLOCRON VAULT", "map": "RAKATAN  /  STAR MAP",
         "table": "IMPERIAL  /  HOLOTABLE"}.get(mode, "SITH  /  HOLOCRON VAULT")
-    subheading.text = "KORRIBAN ARCHIVES    •    %s NAVIGATION" % {
-        "vault": "SITH", "map": "RAKATAN", "table": "IMPERIAL"
-    }.get(mode, "SITH")
+    subheading.text = {
+        "vault": "KORRIBAN ARCHIVES",
+        "map": "HYPERSPACE ROUTES",
+        "table": "LIVE WINDOWS BY SECTOR"
+    }.get(mode, "")
     for id in sector_buttons:
         var button: Button = sector_buttons[id]
         var tint: Color = HyprBridge.TINTS[id]
         var engaged: bool = int(id) == selected
+        var short_name: String = "DATABANK" if id == 5 and mode == "table" else HyprBridge.NAMES[id]
+        button.text = "%02d  %s" % [id, short_name]
+        if mode == "table":
+            button.text += " · %d" % int(records.get(id, {}).get("count", 0))
         button.add_theme_stylebox_override("normal",
             _skin(tint if engaged else Color("#565067"),
                 Color(tint.r * .25, tint.g * .20, tint.b * .24, .97) if engaged else Color(0.055, 0.066, .087, .92),

@@ -325,7 +325,7 @@ hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-quick-setti
 hl.bind("SUPER + SHIFT + Y", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-starwars menu"))
 -- HoloNet Command Console; retains Super+Space as direct application search.
 hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-holonet-launcher"))
--- Opt-in Godot 3D Sith holocron picker; existing Super+Tab overview is untouched.
+-- Alternate shortcut for the Sith Holocron Vault.
 hl.bind("SUPER + SHIFT + J", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-sith-vault"))
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-picker"))
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
@@ -396,8 +396,8 @@ hl.bind("XF86LaunchA", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-overview-grid"))
 hl.bind("Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-copy"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot region-save"))
 hl.bind("CTRL + Print", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot full-copy"))
--- A keyboard fallback to the same overview/window picker.
-hl.bind("SUPER + Tab", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-overview-grid"))
+-- Open the fullscreen Sith Holocron Vault workspace picker.
+hl.bind("SUPER + Tab", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-sith-vault"))
 
 -- The physical lock/power key is handled by hardware/logind; leave it unchanged
 -- to avoid accidentally shutting down or suspending this running laptop.
@@ -466,7 +466,7 @@ hl.window_rule({
 hl.window_rule({
     name = "sith-holocron-vault-picker",
     match = { class = "^Sith Holocron Vault$" },
-    float = true, center = true, size = "1160 700",
+    float = true, center = true,
 })
 hl.window_rule({
     name = "vscode-workspace-3",

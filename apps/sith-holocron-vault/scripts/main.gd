@@ -9,7 +9,7 @@ var active_workspace: int = 1
 var records: Dictionary = {}
 var mode: String = "vault"
 var closed: bool = false
-var target_look: Vector3 = Vector3(0, 1.7, 0)
+var target_look: Vector3 = Vector3(3.65, 1.35, 0)
 var refresh_timer: Timer
 var self_test: bool = false
 
@@ -71,6 +71,7 @@ func _fetch_data() -> void:
     if closed:
         return
     records = HyprBridge.snapshot()
+    world.update_occupancy(records)
     hud.display(focus_id, mode, records, active_workspace)
 
 func _select(id: int) -> void:
@@ -93,7 +94,9 @@ func _activate(id: int) -> void:
     closed = true
     # Keep current focus when Hyprland is unavailable instead of guessing.
     var switched: bool = HyprBridge.switch_to(id)
-    if not switched:
+    if switched:
+        HyprBridge.remember(id)
+    else:
         push_warning("Hyprland refused workspace switch: %d" % id)
     get_tree().quit()
 
@@ -110,18 +113,18 @@ func _process(delta: float) -> void:
     var base_camera: Vector3
     match mode:
         "vault":
-            base_camera = Vector3(2.4, 8.65, 18.3)
+            base_camera = Vector3(3.7, 10.2, 18.9)
         "map":
-            base_camera = Vector3(2.4, 11.8, 17.4)
+            base_camera = Vector3(3.7, 13.2, 19.4)
         _:
-            base_camera = Vector3(2.4, 10.5, 17.1)
+            base_camera = Vector3(3.7, 12.1, 18.6)
     var focus_point: Vector3 = Vector3.ZERO
     var idx: int = HyprBridge.WORKSPACES.find(focus_id)
     if idx >= 0 and mode != "table":
         focus_point = VaultWorld.STATIONS[idx] * .13
     var camera_target: Vector3 = base_camera + Vector3(focus_point.x * .24, 0, 0)
     world.camera.position = world.camera.position.lerp(camera_target, minf(1.0, delta * 2.4))
-    target_look = target_look.lerp(Vector3(2.35 + focus_point.x * .30, 1.55, focus_point.z),
+    target_look = target_look.lerp(Vector3(3.65 + focus_point.x * .30, 1.35, focus_point.z),
         minf(1.0, delta * 2.6))
     world.camera.look_at(target_look)
 
@@ -155,14 +158,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         _select(id)
     get_viewport().set_input_as_handled()
 
-func _input(event: InputEvent) -> void:
-    if mode != "vault" and mode != "map":
-        return
+func _unhandled_input(event: InputEvent) -> void:
     var pointer: Vector2
     if event is InputEventMouseMotion:
         pointer = event.position
-        if pointer.x < 40 or pointer.x > 827 or pointer.y < 110 or pointer.y > 617:
-            return
         var hovered: int = _hit_node(pointer)
         if hovered != -1 and hovered != focus_id:
             _select(hovered)
@@ -170,8 +169,6 @@ func _input(event: InputEvent) -> void:
         if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
             return
         pointer = event.position
-        if pointer.x > 828 or pointer.y > 622:
-            return
         var hovered: int = _hit_node(pointer)
         if hovered >= 0:
             _activate(hovered)
@@ -185,7 +182,7 @@ func _hit_node(pointer: Vector2) -> int:
         if mode == "map":
             pt = pt * 1.18 + Vector3(0, 1.7, 0)
         else:
-            pt += Vector3(0, 2.75, 0)
+            pt = world.sector_centers[HyprBridge.WORKSPACES[i]] if mode == "table" else world.gems[HyprBridge.WORKSPACES[i]].global_position
         var camera_pos: Vector2 = world.camera.unproject_position(pt)
         var dist: float = pointer.distance_to(camera_pos)
         if dist < nearest:
