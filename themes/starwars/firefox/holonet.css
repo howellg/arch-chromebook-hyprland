@@ -29,19 +29,25 @@
       inline-size: clamp(120px, 23vw, 265px) !important;
     }
 
-    .search-inner-wrapper {
-      margin-block-start: 1.65rem !important;
+    /* The native handoff label lives inside a shadow root. Cover its visual
+       text while leaving the search engine icon and native control usable. */
+    .search-inner-wrapper::after {
+      content: "Search the HoloNet" / "";
+      position: absolute;
+      inset-block: 5px;
+      inset-inline: 48px 16px;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      background: #171b26;
+      color: #b5b9c5;
+      font-size: .95rem;
+      pointer-events: none;
     }
 
-    .search-inner-wrapper::before {
-      content: "SEARCH THE HOLONET";
-      position: absolute;
-      inset-inline-start: 0;
-      bottom: calc(100% + .55rem);
-      color: #f18b88;
-      font: 700 .72rem monospace;
-      letter-spacing: .16em;
-      pointer-events: none;
+    .search-inner-wrapper:focus-within::after,
+    .search-inner-wrapper:has(content-search-handoff-ui[fakefocus])::after {
+      display: none;
     }
 
     .search-handoff-button,
