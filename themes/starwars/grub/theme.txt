@@ -1,0 +1,69 @@
+title-text: ""
+desktop-image: "bridge.png"
+desktop-color: "#0b101a"
+desktop-image-scale-method: "stretch"
+message-font: "Imperial Mono Regular 18"
+message-color: "#f1e9ed"
+message-bg-color: "#131722"
+terminal-font: "Imperial Mono Regular 18"
+
++ label {
+    left = 15%
+    top = 10%
+    width = 70%
+    height = 34
+    align = "center"
+    text = "IMPERIAL COMMAND"
+    font = "Imperial Mono Bold 26"
+    color = "#ed7775"
+}
+
++ label {
+    left = 15%
+    top = 18%
+    width = 70%
+    height = 26
+    align = "center"
+    text = "BOOT CONTROL"
+    font = "Imperial Mono Regular 18"
+    color = "#c8cdd9"
+}
+
++ boot_menu {
+    left = 14%
+    top = 25%
+    width = 72%
+    height = 49%
+    item_font = "Imperial Mono Regular 18"
+    selected_item_font = "Imperial Mono Regular 18"
+    item_color = "#c8cdd9"
+    selected_item_color = "#fff0ec"
+    item_height = 31
+    item_spacing = 3
+    item_padding = 8
+    menu_pixmap_style = "panel_*.png"
+    selected_item_pixmap_style = "selected_*.png"
+}
+
++ label {
+    id = "__timeout__"
+    left = 15%
+    top = 77%
+    width = 70%
+    height = 25
+    align = "center"
+    text = "@TIMEOUT_NOTIFICATION_LONG@"
+    font = "Imperial Mono Regular 18"
+    color = "#ed7775"
+}
+
++ label {
+    left = 10%
+    top = 86%
+    width = 80%
+    height = 25
+    align = "center"
+    text = "Arrows  Select    Enter  Boot    e  Edit    c  Console"
+    font = "Imperial Mono Regular 18"
+    color = "#c8cdd9"
+}
