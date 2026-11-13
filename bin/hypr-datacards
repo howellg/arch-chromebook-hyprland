@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Browse local cliphist entries and restore the selected datacard."""
+from concurrent.futures import ThreadPoolExecutor
+import re
+import subprocess
+from urllib.parse import urlsplit
+
+from galactic_panel import GLib, Gtk, heading, panel
+from gi.repository import Gdk, GdkPixbuf, Pango
+
+BINARY = re.compile(r"^\[\[ binary data .*? (\w+)(?: \d+x\d+)? \]\]$")
+IMAGE_MIME = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+              "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
+              "tiff": "image/tiff"}
+
+
+def run(*args, input=None):
+    return subprocess.run(args, input=input, stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, timeout=4, check=True).stdout
+
+
+def entries(data):
+    for line in data.decode("utf-8", "replace").splitlines():
+        id_, separator, text = line.partition("\t")
+        if not separator or not id_.isdecimal():
+            continue
+        binary = BINARY.fullmatch(text)
+        if binary:
+            mime = IMAGE_MIME.get(binary[1].lower())
+            yield id_, "Image" if mime else "Binary", text, mime
+            continue
+        try:
+            link = text.startswith(("https://", "http://")) and bool(urlsplit(text).netloc)
+        except ValueError:
+            link = False
+        yield id_, "Link" if link else "Text", text, "text/plain;charset=utf-8"
+
+
+def main():
+    window = panel("Imperial Datacards", 820, 495)
+    window.set_decorated(False)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    window.add(root)
+    root.pack_start(heading("\ue905   IMPERIAL DATABANK / CLIPBOARD"), False, False, 0)
+    toolbar = Gtk.Box(spacing=8)
+    root.pack_start(toolbar, False, False, 0)
+    search = Gtk.SearchEntry()
+    search.set_placeholder_text("Search clipboard")
+    toolbar.pack_start(search, True, True, 0)
+    kind = Gtk.ComboBoxText()
+    for name in ("All", "Text", "Link", "Image"):
+        kind.append(name, name)
+    kind.set_active_id("All")
+    toolbar.pack_start(kind, False, False, 0)
+
+    body = Gtk.Box(spacing=10)
+    root.pack_start(body, True, True, 0)
+    listing = Gtk.ScrolledWindow()
+    listing.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    body.pack_start(listing, True, True, 0)
+    rows = Gtk.ListBox()
+    rows.set_activate_on_single_click(False)
+    listing.add(rows)
+    empty = Gtk.Label(label="Clipboard history is empty")
+    rows.set_placeholder(empty)
+
+    detail = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    detail.get_style_context().add_class("destination")
+    detail.set_size_request(310, -1)
+    body.pack_end(detail, False, False, 0)
+    header = Gtk.Label(xalign=0)
+    header.get_style_context().add_class("app-name")
+    detail.pack_start(header, False, False, 0)
+    preview = Gtk.Label(xalign=0, yalign=0, wrap=True, selectable=True, max_width_chars=31)
+    preview.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+    preview_scroll = Gtk.ScrolledWindow()
+    preview_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    preview_scroll.add(preview)
+    detail.pack_start(preview_scroll, True, True, 0)
+    image = Gtk.Image()
+    image.set_no_show_all(True)
+    detail.pack_start(image, True, True, 0)
+    restore = Gtk.Button(label="Copy selected")
+    detail.pack_end(restore, False, False, 0)
+    worker = ThreadPoolExecutor(max_workers=1)
+    preview_job = None
+    selected = None
+    window.connect("destroy", lambda *_: worker.shutdown(wait=False, cancel_futures=True))
+    failed = False
+
+    try:
+        for item in entries(run("cliphist", "list")):
+            row = Gtk.ListBoxRow()
+            row.item = item
+            _, category, text, _ = item
+            line = Gtk.Box(spacing=9)
+            icon = Gtk.Label(label={"Text": "󰦨", "Link": "󰌷", "Image": "󰋩", "Binary": "\ue905"}[category])
+            line.pack_start(icon, False, False, 0)
+            label = Gtk.Label(label=text, xalign=0, ellipsize=Pango.EllipsizeMode.END,
+                              max_width_chars=43)
+            line.pack_start(label, True, True, 0)
+            row.add(line)
+            rows.add(row)
+    except (OSError, subprocess.SubprocessError):
+        failed = True
+
+    def matches(row):
+        query = search.get_text().casefold().split()
+        _, category, text, _ = row.item
+        return (kind.get_active_id() in ("All", category)
+                and all(word in text.casefold() for word in query))
+
+    def update_image(row, data):
+        if row is not selected:
+            return GLib.SOURCE_REMOVE
+        if not data:
+            preview.set_text("Image preview unavailable")
+            return GLib.SOURCE_REMOVE
+        try:
+            loader = GdkPixbuf.PixbufLoader.new()
+            def resize(pixbuf_loader, width, height):
+                scale = min(1, 275 / width, 250 / height)
+                pixbuf_loader.set_size(max(1, round(width * scale)), max(1, round(height * scale)))
+            loader.connect("size-prepared", resize)
+            loader.write(data)
+            loader.close()
+            image.set_from_pixbuf(loader.get_pixbuf())
+            preview_scroll.hide()
+            image.show()
+        except GLib.Error:
+            preview.set_text("Image preview unavailable")
+        return GLib.SOURCE_REMOVE
+
+    def image_data(row):
+        try:
+            return run("cliphist", "decode", row.item[0])
+        except (OSError, subprocess.SubprocessError):
+            return b""
+
+    def show_selection(_, row):
+        nonlocal selected, preview_job
+        selected = row
+        if preview_job:
+            preview_job.cancel()
+        image.clear()
+        image.hide()
+        preview_scroll.show()
+        restore.set_sensitive(row is not None)
+        if row is None:
+            header.set_text("Preview")
+            preview.set_text("")
+            return
+        _, category, text, _ = row.item
+        header.set_text(category)
+        preview.set_text(text if category != "Image" else "Loading preview…")
+        if category == "Image":
+            preview_job = worker.submit(image_data, row)
+            def complete(future):
+                if not future.cancelled():
+                    GLib.idle_add(update_image, row, future.result())
+            preview_job.add_done_callback(complete)
+
+    def filter_rows(*_):
+        rows.invalidate_filter()
+        empty.set_text("Clipboard history unavailable" if failed else (
+            "No matching datacards" if rows.get_children() else "Clipboard history is empty"))
+        rows.select_row(next((row for row in rows.get_children() if matches(row)), None))
+
+    def copy(row):
+        if row is None:
+            return
+        id_, _, _, mime = row.item
+        try:
+            data = run("cliphist", "decode", id_)
+            subprocess.run(["wl-copy", *(("--type", mime) if mime else ())],
+                           input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=4, check=True)
+        except (OSError, subprocess.SubprocessError):
+            header.set_text("Could not copy this datacard")
+            return
+        window.close()
+
+    def move(_, event):
+        if event.keyval not in (Gdk.KEY_Up, Gdk.KEY_Down) or selected is None:
+            return False
+        matching = [row for row in rows.get_children() if matches(row)]
+        if selected not in matching:
+            return False
+        index = matching.index(selected) + (1 if event.keyval == Gdk.KEY_Down else -1)
+        if 0 <= index < len(matching):
+            row = matching[index]
+            rows.select_row(row)
+            bounds = row.get_allocation()
+            listing.get_vadjustment().clamp_page(bounds.y, bounds.y + bounds.height)
+        return True
+
+    rows.set_filter_func(matches)
+    rows.connect("row-selected", show_selection)
+    rows.connect("row-activated", lambda _, row: copy(row))
+    search.connect("search-changed", filter_rows)
+    search.connect("activate", lambda *_: copy(selected))
+    search.connect("key-press-event", move)
+    kind.connect("changed", filter_rows)
+    restore.connect("clicked", lambda *_: copy(selected))
+    window.show_all()
+    filter_rows()
+    search.grab_focus()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

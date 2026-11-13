@@ -6,6 +6,10 @@ if [[ "${1:-}" == "--clear" ]]; then
   notify-send -a "Clipboard" "Clipboard history cleared"
   exit 0
 fi
+if [[ -x "$HOME/.local/bin/hypr-datacards" ]] &&
+    [[ $(cat "$HOME/.local/state/starwars-theme/selection" 2>/dev/null || :) =~ ^(imperial|sith|rakatan)$ ]]; then
+  exec "$HOME/.local/bin/hypr-datacards"
+fi
 list=$(cliphist list 2>/dev/null || :)
 if [[ -z "$list" ]]; then
   notify-send -a "Clipboard" "History is empty" "Copy text or an image first."

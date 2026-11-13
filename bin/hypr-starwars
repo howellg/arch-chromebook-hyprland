@@ -251,9 +251,13 @@ def hyprpaper_apply(file):
 def wallpaper_apply(file):
     if not file.is_file():return
     if awww_ready():
-        rc,_,err=run(AWWW,"img","--resize","fit","--transition-type","fade",
-                     "--transition-duration","0.38","--transition-fps","60",str(file),
-                     timeout=12)
+        motion = file.with_suffix(".gif")
+        artwork = motion if file.stem == "comms" and motion.is_file() else file
+        options = (AWWW, "img", "--resize", "fit", "--transition-type", "fade",
+                   "--transition-duration", "0.38", "--transition-fps", "60")
+        rc,_,err=run(*options, str(artwork), timeout=12)
+        if rc and artwork != file:
+            rc,_,err=run(*options, str(file), timeout=12)
         if rc==0:
             # Swap daemons only after the replacement image was submitted.
             if run("pgrep","-x","hyprpaper")[0] == 0:

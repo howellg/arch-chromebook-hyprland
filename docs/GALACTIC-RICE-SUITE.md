@@ -189,3 +189,17 @@ which can count shared memory more than once. Background tasks are available
 under Top Processes.
 Use **Inspect CPU apps** or **Inspect RAM apps** from Overview to jump straight
 to that ranking.
+
+## Communications deck and datacards
+
+Workspace 4 uses the communications deck viewport. With FFmpeg available
+when generating wallpapers, awww shows a low-frame-rate loop of two ships
+near the relay station. Other wallpaper setups use the still artwork.
+
+**Super+Shift+V** opens Imperial Datacards in Galactic themes. Filter local
+clipboard history by text, links, or images, use the arrow keys to select
+a card, and press Enter to restore it. **Esc** closes the panel. The
+existing `hypr-clipboard --clear` command still clears the history.
+
+`galactic info` shows a holocron in Sith Archives and a Star Forge core in
+Rakatan Research, alongside the Imperial Death Star.
