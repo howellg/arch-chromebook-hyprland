@@ -3,19 +3,17 @@
 from concurrent.futures import ThreadPoolExecutor
 from html import escape
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
 from threading import Thread
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
-from xml.etree import ElementTree
+from arulia_vaults import VAULTS, arulia_vault_id, obsidian_open_uri, obsidian_vaults, syncthing_config
 
 RELAY = "AruleWiki"
 NETWORK_MANAGER = "nm-connection-editor"
 SYNCTHING_DASHBOARD = "http://127.0.0.1:8384"
-VAULTS = ("DM", "Player")
 
 
 def command(*args):
@@ -72,15 +70,6 @@ def tailscale_status():
         else:
             description += f" · {RELAY} {'online' if peer.get('Online') else 'offline'}"
     return description
-
-
-def syncthing_config():
-    paths = (command("syncthing", "paths") or "").splitlines()
-    try:
-        config_path = Path(paths[paths.index("Configuration file:") + 1].strip())
-        return ElementTree.parse(config_path).getroot()
-    except (OSError, ValueError, IndexError, ElementTree.ParseError):
-        return None
 
 
 def relay_device(config):
@@ -183,16 +172,6 @@ def vault_status(folder, device, connected, get):
     return state.replace("-", " ").capitalize()
 
 
-def obsidian_vaults():
-    config_home = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    try:
-        data = json.loads((config_home / "obsidian/obsidian.json").read_text())
-        return {Path(item["path"]).resolve(): id_ for id_, item in data["vaults"].items()
-                if item.get("path")}
-    except (OSError, ValueError, KeyError, RuntimeError):
-        return {}
-
-
 def vault_statuses(config, connected):
     if config is None:
         return [("Local status unavailable", None)] * len(VAULTS)
@@ -204,9 +183,7 @@ def vault_statuses(config, connected):
     def reading(name):
         folder = folders.get(name.casefold())
         status = vault_status(folder, device, connected, get)
-        path = folder.get("path") if folder is not None else None
-        vault_id = registered.get(Path(path).expanduser().resolve()) if path else None
-        return status, vault_id
+        return status, arulia_vault_id(folder, registered)
 
     with ThreadPoolExecutor(max_workers=len(VAULTS)) as pool:
         return list(pool.map(reading, VAULTS))
@@ -307,7 +284,7 @@ def launch():
             status.set_text(f"Could not open {args[0]}.")
 
     def open_vault(vault_id):
-        spawn("xdg-open", "obsidian://open?" + urlencode({"vault": vault_id}, quote_via=quote))
+        spawn("xdg-open", obsidian_open_uri(vault_id))
 
     for title, args in (("Network settings", (NETWORK_MANAGER,)),
                         ("Syncthing dashboard", ("xdg-open", SYNCTHING_DASHBOARD))):
