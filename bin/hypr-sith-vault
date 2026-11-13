@@ -28,7 +28,10 @@ if ! flock -n 9; then
 fi
 # Capture before the fullscreen window covers the desktop. Keep pixels in memory.
 if [[ " $* " != *" --headless "* && " $* " != *" --self-test "* ]]; then
-  VAULT_PREVIEW="$(python3 "$project/capture-preview.py" 2>/dev/null || true)"
-  export VAULT_PREVIEW
+  index=0
+  while IFS= read -r preview; do
+    export "VAULT_PREVIEW_$index=$preview"
+    index=$((index + 1))
+  done < <(python3 "$project/capture-preview.py" 2>/dev/null)
 fi
 exec "$engine" --path "$project" --rendering-method gl_compatibility --fullscreen "$@"

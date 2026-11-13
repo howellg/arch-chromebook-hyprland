@@ -1,13 +1,46 @@
 """Capture a small preview of the focused, visible window before Vault opens."""
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import base64
 import json
 import re
 import subprocess
 
 
-def capture():
-    def query(command):
-        return json.loads(subprocess.check_output(["hyprctl", command, "-j"], timeout=.5))
+WORKSPACES = (1, 2, 3, 4, 5, 9)
+HELPER = Path.home() / ".local/share/sith-holocron-vault/workspace-capture"
+
+
+def query(command):
+    return json.loads(subprocess.check_output(["hyprctl", command, "-j"], timeout=.5))
+
+
+def workspace_preview(workspace):
+    try:
+        data = subprocess.check_output(
+            [HELPER, workspace["name"]], timeout=2.2, stderr=subprocess.DEVNULL
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if 0 < len(data) < 60000:
+        return f'{workspace["id"]}:' + base64.b64encode(data).decode("ascii")
+    return ""
+
+
+def capture_workspaces():
+    if not HELPER.is_file():
+        return set()
+    occupied = [ws for ws in query("workspaces")
+                if ws["id"] in WORKSPACES and ws.get("windows", 0) > 0]
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        previews = list(pool.map(workspace_preview, occupied))
+    for preview in previews:
+        if preview:
+            print(preview)
+    return {int(preview.split(":", 1)[0]) for preview in previews if preview}
+
+
+def capture_focused(captured):
 
     window = query("activewindow")
     address = window.get("address", "")
@@ -19,7 +52,7 @@ def capture():
     if not monitor or monitor.get("transform", 0) != 0:
         return
     workspace = window.get("workspace", {}).get("id")
-    if workspace not in (1, 2, 3, 4, 5, 9) or monitor["activeWorkspace"]["id"] != workspace:
+    if workspace in captured or workspace not in WORKSPACES or monitor["activeWorkspace"]["id"] != workspace:
         return
     x, y = window["at"]
     width, height = window["size"]
@@ -42,6 +75,6 @@ def capture():
 
 if __name__ == "__main__":
     try:
-        capture()
+        capture_focused(capture_workspaces())
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         pass
