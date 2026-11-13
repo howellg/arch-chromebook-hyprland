@@ -29,8 +29,12 @@ cleanup() {
 }
 trap cleanup EXIT
 test -s "$cfg"
-test -d /boot/grub/themes
+mountpoint -q /boot || {
+    printf '%s\n' "Mount the Chromebook boot partition at /boot before installing the theme." >&2
+    exit 1
+}
 bash "$src/build.sh" "$scratch/theme"
+install -d -m755 /var/backups
 backup=$(mktemp -d /var/backups/grub-imperial.XXXXXX)
 cp -- "$cfg" "$backup/grub.cfg"
 if [[ -e "$dropin" ]]; then
