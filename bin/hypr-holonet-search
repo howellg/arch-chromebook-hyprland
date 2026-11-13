@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Search installed desktop applications and HoloNet destinations."""
+from pathlib import Path
+import subprocess
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gio, GLib, Gtk
+
+BIN = Path.home() / ".local/bin"
+ROUTES = {
+    "firefox": "01 · IMPERIAL INTELLIGENCE",
+    "kitty": "02 · SITH ARCHIVES",
+    "code": "03 · RAKATAN RESEARCH",
+    "discord": "04 · FLEET COMMUNICATIONS",
+}
+ACTIONS = [
+    ("Sith Holocron Vault", "\ue902", "Workspace navigation", "hypr-sith-vault"),
+    ("HoloNet Console", "\ue900", "Projects, terminals and system commands", "hypr-holonet-launcher"),
+    ("Tactical Quick Settings", "\ue905", "Desktop controls", "hypr-quick-settings"),
+]
+
+class Launcher(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="HoloNet Application Search")
+        self.set_default_size(720, 440)
+        self.set_decorated(False)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_border_width(18)
+        self.get_style_context().add_class("holonet-search")
+        self.connect("destroy", Gtk.main_quit)
+        self.connect("key-press-event", self.on_key)
+
+        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add(main)
+        title = Gtk.Label(label="\ue900   HOLONET  /  APPLICATIONS", xalign=0)
+        title.get_style_context().add_class("heading")
+        main.pack_start(title, False, False, 0)
+        self.search = Gtk.SearchEntry(placeholder_text="Search installed applications")
+        self.search.connect("changed", self.filter_rows)
+        self.search.connect("activate", lambda _: self.launch(self.results.get_selected_row()))
+        main.pack_start(self.search, False, False, 0)
+
+        body = Gtk.Box(spacing=14)
+        main.pack_start(body, True, True, 0)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        body.pack_start(scroll, True, True, 0)
+        self.results = Gtk.ListBox()
+        self.results.set_activate_on_single_click(False)
+        self.results.connect("row-activated", lambda _, row: self.launch(row))
+        self.results.connect("row-selected", self.preview)
+        scroll.add(self.results)
+
+        detail = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        detail.set_size_request(220, -1)
+        detail.get_style_context().add_class("destination")
+        body.pack_start(detail, False, False, 0)
+        self.icon = Gtk.Image()
+        self.symbol = Gtk.Label()
+        self.symbol.get_style_context().add_class("sector-icon")
+        self.name = Gtk.Label(wrap=True)
+        self.name.get_style_context().add_class("app-name")
+        self.destination = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER)
+        for widget in (self.icon, self.symbol, self.name, self.destination):
+            detail.pack_start(widget, False, False, 0)
+
+        for name, symbol, destination, command in ACTIONS:
+            self.add_result(name, None, symbol, destination, command, command)
+        apps = sorted((a for a in Gio.AppInfo.get_all() if a.should_show()),
+                      key=lambda a: a.get_display_name().casefold())
+        for app in apps:
+            executable = Path(app.get_executable() or "").name.casefold()
+            destination = ROUTES.get(executable, "Installed application")
+            self.add_result(app.get_display_name(), app, "", destination, "", executable)
+        self.matches = set(self.results.get_children())
+        self.results.set_filter_func(lambda row: row in self.matches)
+        self.filter_rows()
+        self.show_all()
+        self.search.grab_focus()
+
+    def add_result(self, name, app, symbol, destination, command, keyword):
+        row = Gtk.ListBoxRow()
+        row.name, row.app, row.destination, row.command = name, app, destination, command
+        row.symbol = symbol
+        row.terms = f"{name} {keyword} {destination}".casefold()
+        item = Gtk.Box(spacing=10)
+        if app:
+            icon = Gtk.Image.new_from_gicon(app.get_icon() or Gio.ThemedIcon.new("application-x-executable"),
+                                           Gtk.IconSize.MENU)
+        else:
+            icon = Gtk.Label(label=symbol)
+            icon.get_style_context().add_class("sector-icon")
+        item.pack_start(icon, False, False, 0)
+        label = Gtk.Label(label=name, xalign=0)
+        item.pack_start(label, True, True, 0)
+        row.add(item)
+        self.results.add(row)
+
+    def filter_rows(self, *_):
+        query = self.search.get_text().casefold().strip()
+        rows = self.results.get_children()
+        self.matches = {row for row in rows if all(word in row.terms for word in query.split())}
+        self.results.set_sort_func(lambda a, b: (
+            int(not a.name.casefold().startswith(query)) - int(not b.name.casefold().startswith(query))
+        ))
+        self.results.invalidate_filter()
+        ordered = [self.results.get_row_at_index(i) for i in range(len(rows))]
+        row = next((row for row in ordered if row in self.matches), None)
+        self.results.select_row(row)
+        self.preview(self.results, row)
+
+    def preview(self, _, row):
+        self.name.set_text(row.name if row else "No matching applications")
+        self.destination.set_text(row.destination if row else "")
+        self.symbol.set_text(row.symbol if row else "")
+        if row and row.app:
+            icon = row.app.get_icon() or Gio.ThemedIcon.new("application-x-executable")
+            self.icon.set_from_gicon(icon, Gtk.IconSize.DIALOG)
+        else:
+            self.icon.clear()
+
+    def on_key(self, _, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
+            selected = self.results.get_selected_row()
+            if selected:
+                step = -1 if event.keyval == Gdk.KEY_Up else 1
+                index = selected.get_index() + step
+                while index >= 0:
+                    row = self.results.get_row_at_index(index)
+                    if row is None:
+                        break
+                    if row in self.matches:
+                        self.results.select_row(row)
+                        adjustment = self.results.get_parent().get_vadjustment()
+                        bounds = row.get_allocation()
+                        adjustment.clamp_page(bounds.y, bounds.y + bounds.height)
+                        break
+                    index += step
+            return True
+        return False
+
+    def launch(self, row):
+        if row is None:
+            return
+        try:
+            if row.app:
+                row.app.launch([], Gdk.Display.get_default().get_app_launch_context())
+            else:
+                subprocess.Popen([str(BIN / row.command)], start_new_session=True)
+        except (OSError, GLib.Error) as exc:
+            self.destination.set_text(str(exc))
+            return
+        self.close()
+
+GLib.set_prgname("holonet-search")
+provider = Gtk.CssProvider()
+provider.load_from_path(str(Path.home() / ".config/chromebook/quick-settings.css"))
+Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+Launcher()
+Gtk.main()

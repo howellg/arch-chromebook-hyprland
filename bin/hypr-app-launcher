@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Unified Catppuccin Wofi launcher for Hyprland on the Chromebook.
+# Use HoloNet while Galactic Appearance is active.
+selection="$HOME/.local/state/starwars-theme/selection"
+if [[ -r "$selection" && -x "$HOME/.local/bin/hypr-holonet-search" ]]; then
+    case "$(cat "$selection")" in
+        imperial|sith|rakatan) exec "$HOME/.local/bin/hypr-holonet-search" ;;
+    esac
+fi
 exec wofi \
     --show drun \
     --insensitive \
