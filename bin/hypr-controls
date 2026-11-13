@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
-# Volume/brightness with a small Mako progress notification; no new daemon needed.
+# Volume and brightness feedback through Mako.
 set -euo pipefail
 mode=${1:-}
 sink=@DEFAULT_AUDIO_SINK@
 source=@DEFAULT_AUDIO_SOURCE@
+theme=$(cat "$HOME/.local/state/starwars-theme/selection" 2>/dev/null || :)
+notify_control() {
+  local title=$1 tag=$2 timeout=$3
+  shift 3
+  notify-send -a "Chromebook controls" -t "$timeout" \
+    -h "string:x-dunst-stack-tag:chromebook-$tag" "$@" "$title"
+}
+
 notify_progress() {
-  local title=$1 value=$2 id=$3
-  notify-send -a "Chromebook controls" -t 1000 -r "$id" \
-    -h "int:value:$value" -h "string:x-canonical-private-synchronous:$title" \
-    "$title · $value%"
+  local title=$1 value=$2 tag=$3
+  local filled meter="" index
+  if [[ "$theme" == imperial || "$theme" == sith || "$theme" == rakatan ]]; then
+    filled=$(( (value + 5) / 10 ))
+    for (( index = 0; index < 10; index++ )); do
+      if (( index < filled )); then meter+="▰ "; else meter+="▱ "; fi
+    done
+    notify-send -a "Chromebook controls" -t 1400 \
+      -h "string:x-dunst-stack-tag:chromebook-$tag" "$title · $value%" "${meter% }"
+  else
+    notify_control "$title · $value%" "$tag" 1000 -h "int:value:$value"
+  fi
 }
 case "$mode" in
   volume-up)
@@ -20,17 +36,21 @@ case "$mode" in
   mic-mute)
     wpctl set-mute "$source" toggle
     info=$(wpctl get-volume "$source")
-    [[ "$info" == *MUTED* ]] && notify-send -a "Chromebook controls" -t 1300 "Microphone muted" || notify-send -a "Chromebook controls" -t 1300 "Microphone unmuted"
+    if [[ "$info" == *MUTED* ]]; then
+      notify_control "Microphone muted" microphone 1300
+    else
+      notify_control "Microphone unmuted" microphone 1300
+    fi
     exit 0 ;;
   brightness-up)
     brightnessctl -c backlight -e4 -n2 set 5%+ >/dev/null
     value=$(brightnessctl -c backlight -m | cut -d, -f4 | tr -d '%')
-    notify_progress "Brightness" "$value" 5402
+    notify_progress "Brightness" "$value" brightness
     exit 0 ;;
   brightness-down)
     brightnessctl -c backlight -e4 -n2 set 5%- >/dev/null
     value=$(brightnessctl -c backlight -m | cut -d, -f4 | tr -d '%')
-    notify_progress "Brightness" "$value" 5402
+    notify_progress "Brightness" "$value" brightness
     exit 0 ;;
   *)
     echo 'Usage: hypr-controls {volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down}' >&2
@@ -39,7 +59,7 @@ esac
 info=$(wpctl get-volume "$sink")
 value=$(awk '{printf "%.0f", $2*100}' <<<"$info")
 if [[ "$info" == *MUTED* ]]; then
-  notify-send -a "Chromebook controls" -t 1200 -r 5401 "Volume muted"
+  notify_control "Volume muted" volume 1200
 else
-  notify_progress "Volume" "$value" 5401
+  notify_progress "Volume" "$value" volume
 fi

@@ -110,3 +110,10 @@ ten-percent ticks, and the battery card uses a segmented meter.
 
 In an Imperial terminal, `galactic info` pairs the hardware report with
 a Death Star. Use `fastfetch` for the standard report.
+
+## Imperial comms notifications
+
+Mako uses a comms-dish glyph and the active faction accent. Critical alerts
+use a brighter red. The volume and brightness keys show ten-segment meters
+with exact percentages, and repeat presses replace the corresponding popup.
+Media control popups stay out of notification history in Galactic themes.
