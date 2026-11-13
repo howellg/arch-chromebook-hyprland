@@ -50,3 +50,22 @@ The Star Wars manager now records the **original Waybar configuration JSON** as 
 - Hyprland reported no configuration errors; no logout or MySQL restart was required.
 
 **Security and known limits:** Hyprlock was deliberately *not used to lock the live laptop* during remote tests, because this could disrupt access. Its generated layout passes static configuration checks but needs a physical lock/unlock visual check on your next convenient login. GTK and Waybar status colors are deliberately lightweight; there is no continual animated background or audio/music playback. Some visual changes apply when a new window is launched rather than recoloring existing Kitty windows.
+
+## Refined Galactic terminals (November 2026)
+
+The earlier terminal combination was visually cluttered: a faction banner **plus** the full Arch `fastfetch` logo and its long report. The refreshed themed Kitty consoles use a compact five-line mission-status panel (faction, location, Arch, uptime, RAM and battery) and a consistent two-line Fish prompt.
+
+- **Sith Archives:** Crimson highlights, Korriban research-vault introduction, Sith-specific Fish syntax colors. Workspace 2.
+- **Rakatan Research:** Cyan/steel-blue holographic palette, Star Map introduction, Rakatan-specific Fish syntax colors. Workspace 3.
+- **Imperial Command:** Clean graphite/red command console. Workspace 1 when explicitly launched.
+- All use JetBrainsMono Nerd Font Mono, more comfortable terminal padding, a thin beam cursor, cohesive tab colors, and a nearly opaque background to improve legibility.
+- The Fish greeting and prompt overrides load only when `STARWARS_TERMINAL_PROFILE` exists, via `config/fish/conf.d/galactic_terminal.fish`. The original `fish_greeting.fish` (including automatic `fastfetch`) and `fish_prompt.fish` remain unchanged for ordinary Kitty/Fish sessions, scripts and SSH.
+- The original full system report is available on demand: `galactic info` (or regular `fastfetch`). `galactic here` opens the terminal corresponding to the current Hyprland workspace (Sith for 2, Rakatan for 3, Imperial elsewhere); `galactic help` lists shortcuts.
+- HoloNet → Terminals now includes **Match Active Workspace** as its first choice.
+- The new compact startup code requires no Python packages beyond the standard library and reads only local `/proc` and battery sysfs.
+
+### Tests and rollback
+
+`python3 themes/starwars/test_terminal_refresh.py` verifies startup width, faction colors, Kitty config startup, error-status display, default Fish isolation, and profile auto-selection. The existing `test_galactic_suite.py` and `test_theme.py` also pass.
+
+Live configuration was backed up before edits at `~/.local/state/starwars-theme/terminal-refresh-20261112-235847/config-backup.tar.gz`. The original Catppuccin desktop style remains available through `Super+Shift+Y`; ordinary Fish is unchanged even when the desktop uses Star Wars. To restore just the previous terminal presets, extract that backup into your home directory, and remove the optional `galactic_terminal.fish` file if desired. Avoid overwriting later changes without reviewing the archive.

@@ -58,7 +58,8 @@ def system():
     if selected in options:launch(*options[selected])
 
 def terminals():
-    labels={"󰑁  Imperial Command":"imperial",
+    labels={"󰑁  Match Active Workspace":"auto",
+            "󰑁  Imperial Command":"imperial",
             "󰞀  Sith Archives":"sith",
             "󰃰  Rakatan Research":"rakatan"}
     selected=choose("HOLO-NET / TERMINAL PROFILES",list(labels))

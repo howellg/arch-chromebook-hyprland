@@ -184,3 +184,7 @@ The six Star Wars wallpapers are now rendered for the Chromebook's **1920×1200 
 Five integrated Star Wars-inspired workstation upgrades now ship as an optional theme layer: an event-driven Galactic Waybar with per-workspace sector status; a themed Imperial/Sith/Rakatan Hyprlock security terminal; the multi-category HoloNet launcher; floating tactical Quick Settings with live network/sync/battery status; and three distinct Kitty/Fish terminal profiles. **Super+Shift+O** opens HoloNet while **Super+Space** keeps direct application search. Sith and Rakatan profile terminals open on workspaces 2 and 3. No existing Fish prompt, ordinary Kitty keybind, or system control was removed.
 
 The Star Wars manager saves and restores the *original Waybar layout* as well as Catppuccin CSS and lock-screen settings. Read [full usage, testing, and rollback instructions](docs/GALACTIC-RICE-SUITE.md).
+
+### Compact Sith / Rakatan / Imperial terminals
+
+The themed Kitty terminals now use five-line mission-status introductions and matching two-line Fish prompts, instead of displaying a giant `fastfetch` on every launch. Syntax colors, fonts, padding and tab accents match the faction, while regular Fish and Kitty greetings remain unchanged. Use `galactic here` to open the current workspace's theme, `galactic sith`/`galactic rakatan`/`galactic imperial` to pick one, or `galactic info` for the original full fastfetch report. See the [terminal refresh notes](docs/GALACTIC-RICE-SUITE.md#refined-galactic-terminals-november-2026).
