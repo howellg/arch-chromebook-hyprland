@@ -23,6 +23,8 @@ func _ready() -> void:
     add_child(world)
     hud = VaultHUD.new()
     add_child(hud)
+    hud.load_preview(OS.get_environment("VAULT_PREVIEW"))
+    OS.unset_environment("VAULT_PREVIEW")
     hud.select_requested.connect(_select)
     hud.activate_requested.connect(_activate)
     hud.mode_requested.connect(_set_mode)

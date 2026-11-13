@@ -36,7 +36,7 @@ static func get_current() -> int:
 static func snapshot() -> Dictionary:
     var records: Dictionary = {}
     for n in WORKSPACES:
-        records[n] = {"count": 0, "windows": [], "title": ""}
+        records[n] = {"count": 0, "windows": [], "title": "", "clients": []}
     var clients: Variant = _json(PackedStringArray(["clients", "-j"]))
     if clients is Array:
         for c in clients:
@@ -59,6 +59,8 @@ static func snapshot() -> Dictionary:
                 item["title"] = display
             var listing: Array = item["windows"]
             listing.append(display)
+            item["clients"].append({"title": display, "class": cls,
+                "address": str(c.get("address", ""))})
     return records
 
 static func switch_to(workspace_id: int) -> bool:
