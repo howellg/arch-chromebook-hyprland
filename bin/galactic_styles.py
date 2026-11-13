@@ -130,11 +130,35 @@ def quick(p):
     a=p["accent"]; bg=p["bg"]; card=p["card"]; txt=p["text"]; muted=p["muted"]
     edge=p["edge"]
     return f"""/* GALACTIC TACTICAL CONSOLE // {p['label']} */
-window.quick-settings {{
-    background-color:alpha({bg},.98);color:{txt};
-    border:2px solid {a};border-radius:6px;
+window.quick-settings, window.holonet-search {{
+    background-image:linear-gradient(to bottom, #232630, {bg});
+    color:{txt}; border:1px solid {edge}; border-bottom:2px solid {a};
+    border-radius:0 12px 0 12px;
 }}
 window.quick-settings label {{color:{txt};font-family:"JetBrainsMono Nerd Font";}}
+window.holonet-search .heading {{
+    font-family:"Galactic Sector","JetBrainsMono Nerd Font",monospace;
+    color:{a};font-size:18px;font-weight:800;letter-spacing:1px;
+}}
+window.holonet-search entry, window.holonet-search .destination {{
+    background:{bg};color:{txt};border:1px solid {edge};
+    border-radius:0 8px 0 8px;padding:12px;
+}}
+window.holonet-search entry:focus {{border-color:{a};}}
+window.holonet-search list {{background:{bg};color:{txt};}}
+window.holonet-search row {{padding:8px 10px;border-left:2px solid transparent;}}
+window.holonet-search row:selected {{
+    background:alpha({a},.21);color:{txt};border-left-color:{a};
+}}
+window.holonet-search .sector-icon {{
+    font-family:"Galactic Sector";font-size:16px;color:{a};
+}}
+window.holonet-search .app-name {{font-weight:800;}}
+window.quick-settings levelbar block {{background-image:none;min-height:5px;border-radius:0;}}
+window.quick-settings levelbar block.filled {{background:{a};}}
+window.quick-settings levelbar block.empty {{background:{edge};}}
+window.quick-settings scale marks mark indicator {{color:{muted};min-height:4px;min-width:1px;}}
+
 window.quick-settings .heading {{
     color:{a};font-weight:800;font-size:19px;letter-spacing:1px;
     margin-bottom:4px;
@@ -167,7 +191,7 @@ window.quick-settings button:active {{
 window.quick-settings trough {{
     min-height:8px;border-radius:3px;background-color:{card};
 }}
-window.quick-settings highlight {{background-color:{a};border-radius:3px;}}
+window.quick-settings highlight {{background-image:none;background-color:{a};border-radius:3px;}}
 window.quick-settings slider {{
     background-color:{a};border-radius:5px;
     min-width:14px;min-height:14px;

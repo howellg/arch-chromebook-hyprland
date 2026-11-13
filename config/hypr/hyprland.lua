@@ -459,6 +459,11 @@ for _, profile in ipairs({
     })
 end
 hl.window_rule({
+    name = "holonet-search-panel",
+    match = { class = "^holonet-search$" },
+    float = true, center = true,
+})
+hl.window_rule({
     name = "galactic-tactical-quick-settings",
     match = { class = "^hypr-quick-settings$" },
     float = true, center = true, size = "540 660",

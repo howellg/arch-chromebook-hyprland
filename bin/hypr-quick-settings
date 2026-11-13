@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 import gi
 gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
 HOME = Path.home()
@@ -64,6 +65,7 @@ class Settings(Gtk.Window):
         self.status_title.get_style_context().add_class("section")
         main.pack_start(self.status_title,False,False,0)
         status_grid=Gtk.Grid(column_spacing=7,row_spacing=7)
+        status_grid.set_column_homogeneous(True)
         self.status_tiles={}
         for i,key in enumerate(("network","tailscale","syncthing","battery")):
             cell=Gtk.Label(label="SCANNING...")
@@ -71,9 +73,20 @@ class Settings(Gtk.Window):
             cell.set_line_wrap(True)
             cell.get_style_context().add_class("status-card")
             cell.set_size_request(190,48)
-            status_grid.attach(cell,i%2,i//2,1,1)
+            if key == "battery":
+                battery_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                battery_card.get_style_context().add_class("status-card")
+                cell.get_style_context().remove_class("status-card")
+                cell.set_size_request(176, 24)
+                self.battery_meter = Gtk.LevelBar.new_for_interval(0, 10)
+                self.battery_meter.set_mode(Gtk.LevelBarMode.DISCRETE)
+                battery_card.pack_start(cell, False, False, 0)
+                battery_card.pack_start(self.battery_meter, False, False, 0)
+                status_grid.attach(battery_card, i % 2, i // 2, 1, 1)
+            else:
+                status_grid.attach(cell, i % 2, i // 2, 1, 1)
             self.status_tiles[key]=cell
-        main.pack_start(status_grid,False,False,0)
+        main.pack_start(status_grid,False,True,0)
         self.volume = self.slider(main, "󰕾  Volume", 100)
         self.brightness = self.slider(main, "󰃠  Brightness", 100)
         info = Gtk.Label(label="Actions")
@@ -128,6 +141,8 @@ class Settings(Gtk.Window):
         parent.pack_start(text, False, False, 0)
         s = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, max_value, 1)
         s.set_draw_value(True)
+        for value in range(0, max_value + 1, 10):
+            s.add_mark(value, Gtk.PositionType.BOTTOM, None)
         s.set_digits(0)
         s.set_size_request(300, 35)
         s.get_style_context().add_class("level")
@@ -162,10 +177,12 @@ class Settings(Gtk.Window):
         self.faction.set_text(f"{theme} COMMAND  /  SECTOR {sector}  /  SYSTEMS ONLINE")
         self.status_tiles["tailscale"].set_text("TAILSCALE  /  "+(cmd("systemctl","is-active","tailscaled") or "UNKNOWN").upper())
         self.status_tiles["syncthing"].set_text("SYNCTHING  /  "+(cmd("systemctl","--user","is-active","syncthing") or "UNKNOWN").upper())
-        battery=HOME/".local/state/chromebook-classroom"
-        try: level=(Path("/sys/class/power_supply/BAT0/capacity").read_text().strip()+"%")
-        except OSError: level="N/A"
-        self.status_tiles["battery"].set_text("BATTERY  /  "+level)
+        try:
+            capacity = int(Path("/sys/class/power_supply/BAT0/capacity").read_text())
+        except (OSError, ValueError):
+            capacity = None
+        self.status_tiles["battery"].set_text("BATTERY  /  " + ("N/A" if capacity is None else f"{capacity}%"))
+        self.battery_meter.set_value(0 if capacity is None else capacity / 10)
         wifi = cmd("nmcli", "radio", "wifi").lower()
         self.status_tiles["network"].set_text("NETWORK  /  "+("CONNECTED" if ":connected:" in cmd("nmcli","-t","-f","DEVICE,STATE,CONNECTION","device","status") else ("READY" if wifi=="enabled" else "OFFLINE")))
         self.wifi.set_label(f"󰤨  Wi-Fi\n{'Enabled' if wifi == 'enabled' else 'Disabled'}")

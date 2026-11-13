@@ -96,3 +96,14 @@ locally. Its source is in `themes/starwars/build_sector_font.py`.
 Waybar uses graphite panels and thin sector accents. In Imperial Hybrid the
 focused window border matches the current sector indicator. Workspace 2 uses
 the original 16:10 Korriban corridor SVG in `themes/starwars/sith.svg`.
+
+### HoloNet application search
+
+With Galactic Appearance active, **Super+Space** opens the HoloNet application
+search. Type to filter, use the arrow keys to select a result, press Enter to
+launch, and press Esc to close. The detail panel shows the destination for
+apps with known workspace assignments. Search also includes the Vault,
+HoloNet Console, and Tactical Quick Settings. The Catppuccin scheme uses Wofi.
+
+Quick Settings shares the console styling. Volume and brightness show
+ten-percent ticks, and the battery card uses a segmented meter.
