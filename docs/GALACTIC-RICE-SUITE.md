@@ -60,7 +60,7 @@ The earlier terminal combination was visually cluttered: a faction banner **plus
 - **Imperial Command:** Clean graphite/red command console. Workspace 1 when explicitly launched.
 - All use JetBrainsMono Nerd Font Mono, more comfortable terminal padding, a thin beam cursor, cohesive tab colors, and a nearly opaque background to improve legibility.
 - The Fish greeting and prompt overrides load only when `STARWARS_TERMINAL_PROFILE` exists, via `config/fish/conf.d/galactic_terminal.fish`. The original `fish_greeting.fish` (including automatic `fastfetch`) and `fish_prompt.fish` remain unchanged for ordinary Kitty/Fish sessions, scripts and SSH.
-- The original full system report is available on demand: `galactic info` (or regular `fastfetch`). `galactic here` opens the terminal corresponding to the current Hyprland workspace (Sith for 2, Rakatan for 3, Imperial elsewhere); `galactic help` lists shortcuts.
+- The system report is available on demand with `galactic info` or `fastfetch`. `galactic here` opens the terminal corresponding to the current Hyprland workspace (Sith for 2, Rakatan for 3, Imperial elsewhere); `galactic help` lists shortcuts.
 - HoloNet → Terminals now includes **Match Active Workspace** as its first choice.
 - The new compact startup code requires no Python packages beyond the standard library and reads only local `/proc` and battery sysfs.
 
@@ -107,3 +107,6 @@ HoloNet Console, and Tactical Quick Settings. The Catppuccin scheme uses Wofi.
 
 Quick Settings shares the console styling. Volume and brightness show
 ten-percent ticks, and the battery card uses a segmented meter.
+
+In an Imperial terminal, `galactic info` pairs the hardware report with
+a Star Destroyer. Use `fastfetch` for the standard report.
