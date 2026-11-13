@@ -1,0 +1,9 @@
+[SddmGreeterTheme]
+Name=Imperial Command
+Description=Imperial bridge sign-in console
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+Theme-Id=imperial-command
+Theme-API=2.0
+QtVersion=6
