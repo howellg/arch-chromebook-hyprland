@@ -1,0 +1,87 @@
+/* Imperial Command browser chrome. Keep website styling in Firefox's hands. */
+@-moz-document url("chrome://browser/content/browser.xhtml") {
+  :root {
+    --imperial-hull: #10131c;
+    --imperial-panel: #1b202c;
+    --imperial-line: #434856;
+    --imperial-red: #ed6664;
+    --imperial-text: #eeeaeb;
+    --imperial-muted: #b5b9c5;
+    --toolbar-bgcolor: var(--imperial-panel) !important;
+    --toolbar-color: var(--imperial-text) !important;
+    --toolbar-field-background-color: #11151f !important;
+    --toolbar-field-focus-background-color: #161b27 !important;
+    --toolbar-field-color: var(--imperial-text) !important;
+    --toolbar-field-focus-color: var(--imperial-text) !important;
+    --toolbarbutton-icon-fill: var(--imperial-muted) !important;
+    --toolbarbutton-hover-background: #34303d !important;
+    --toolbarbutton-active-background: #492e39 !important;
+    --focus-outline-color: var(--imperial-red) !important;
+  }
+
+  #navigator-toolbox {
+    background: var(--imperial-hull) !important;
+    color: var(--imperial-text) !important;
+    border-bottom: 1px solid #a74750 !important;
+  }
+
+  #TabsToolbar, #titlebar {
+    background: var(--imperial-hull) !important;
+    color: var(--imperial-muted) !important;
+  }
+
+  #nav-bar, #PersonalToolbar {
+    background: var(--imperial-panel) !important;
+    color: var(--imperial-text) !important;
+  }
+
+  .tab-background {
+    border-radius: 0 8px 0 8px !important;
+  }
+
+  .tabbrowser-tab:is([selected], [visuallyselected]) .tab-background {
+    background: linear-gradient(#302632, #1e202c) !important;
+    border: 1px solid #74414c !important;
+    box-shadow: inset 0 -2px var(--imperial-red) !important;
+  }
+
+  .tabbrowser-tab:is([selected], [visuallyselected]) .tab-label {
+    color: var(--imperial-text) !important;
+  }
+
+  .tabbrowser-tab:not([selected], [visuallyselected]):hover .tab-background {
+    background-color: #252a36 !important;
+  }
+
+  #urlbar-background, .urlbar-background, #searchbar {
+    background-color: #11151f !important;
+    border: 1px solid var(--imperial-line) !important;
+    border-radius: 0 8px 0 8px !important;
+  }
+
+  #urlbar[focused] :is(#urlbar-background, .urlbar-background) {
+    border-color: #b6535b !important;
+  }
+
+  #urlbar-input {
+    color: var(--imperial-text) !important;
+  }
+
+  .urlbarView-row[selected] .urlbarView-row-inner {
+    background-color: #392936 !important;
+    color: var(--imperial-text) !important;
+  }
+
+  #PanelUI-menu-button .toolbarbutton-icon {
+    list-style-image: url("tie-fighter.svg") !important;
+    -moz-context-properties: fill;
+    fill: var(--imperial-red);
+  }
+
+  /* Keep the stock menu affordance legible in high-contrast mode. */
+  @media (forced-colors: active) {
+    #PanelUI-menu-button .toolbarbutton-icon {
+      list-style-image: revert !important;
+    }
+  }
+}
