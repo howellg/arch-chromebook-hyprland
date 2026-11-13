@@ -12,7 +12,15 @@ function galactic --description "Star Wars terminal profiles and system informat
         case holonet menu
             $HOME/.local/bin/hypr-holonet-launcher
         case info fetch
-            fastfetch
+            set -l config_root "$HOME/.config/fastfetch"
+            if test "$STARWARS_TERMINAL_PROFILE" = imperial; and test -r "$config_root/imperial.jsonc"; and test -r "$config_root/imperial-star-destroyer.txt"
+                fastfetch --config "$config_root/imperial.jsonc" \
+                    --logo "$config_root/imperial-star-destroyer.txt" --logo-type file \
+                    --logo-color-1 white --logo-color-2 bright_white --logo-color-3 red \
+                    --logo-position auto --logo-padding-right 4
+            else
+                fastfetch
+            end
         case compact
             $HOME/.local/bin/hypr-galactic-greeting
         case help '*'
