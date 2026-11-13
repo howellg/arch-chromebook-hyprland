@@ -3,13 +3,17 @@
 from pathlib import Path
 import subprocess
 
+from arulia_vaults import VAULTS, arulia_vault_id, obsidian_open_uri, obsidian_vaults, syncthing_config
+
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk
 
 BIN = Path.home() / ".local/bin"
+DATABANK = "05 · IMPERIAL DATABANK"
 ROUTES = {
+    "obsidian": DATABANK,
     "firefox": "01 · IMPERIAL INTELLIGENCE",
     "kitty": "02 · SITH ARCHIVES",
     "code": "03 · RAKATAN RESEARCH",
@@ -37,7 +41,7 @@ class Launcher(Gtk.Window):
         title = Gtk.Label(label="\ue900   HOLONET  /  APPLICATIONS", xalign=0)
         title.get_style_context().add_class("heading")
         main.pack_start(title, False, False, 0)
-        self.search = Gtk.SearchEntry(placeholder_text="Search installed applications")
+        self.search = Gtk.SearchEntry(placeholder_text="Search applications and vaults")
         self.search.connect("changed", self.filter_rows)
         self.search.connect("activate", lambda _: self.launch(self.results.get_selected_row()))
         main.pack_start(self.search, False, False, 0)
@@ -67,18 +71,33 @@ class Launcher(Gtk.Window):
             detail.pack_start(widget, False, False, 0)
 
         for name, symbol, destination, command in ACTIONS:
-            self.add_result(name, None, symbol, destination, command, command)
+            self.add_result(name, None, symbol, destination, (str(BIN / command),), command)
+        self.add_arulia_vaults()
         apps = sorted((a for a in Gio.AppInfo.get_all() if a.should_show()),
                       key=lambda a: a.get_display_name().casefold())
         for app in apps:
             executable = Path(app.get_executable() or "").name.casefold()
             destination = ROUTES.get(executable, "Installed application")
-            self.add_result(app.get_display_name(), app, "", destination, "", executable)
+            self.add_result(app.get_display_name(), app, "", destination, (), executable)
         self.matches = set(self.results.get_children())
         self.results.set_filter_func(lambda row: row in self.matches)
         self.filter_rows()
         self.show_all()
         self.search.grab_focus()
+
+    def add_arulia_vaults(self):
+        registered = obsidian_vaults()
+        if not registered:
+            return
+        config = syncthing_config()
+        if config is None:
+            return
+        folders = {folder.get("label", "").casefold(): folder for folder in config.findall("folder")}
+        for name in VAULTS:
+            vault_id = arulia_vault_id(folders.get(name.casefold()), registered)
+            if vault_id:
+                self.add_result(f"Arulia {name} Vault", None, "\ue905", DATABANK,
+                                ("xdg-open", obsidian_open_uri(vault_id)), "obsidian dnd")
 
     def add_result(self, name, app, symbol, destination, command, keyword):
         row = Gtk.ListBoxRow()
@@ -151,7 +170,7 @@ class Launcher(Gtk.Window):
             if row.app:
                 row.app.launch([], Gdk.Display.get_default().get_app_launch_context())
             else:
-                subprocess.Popen([str(BIN / row.command)], start_new_session=True)
+                subprocess.Popen(row.command, start_new_session=True)
         except (OSError, GLib.Error) as exc:
             self.destination.set_text(str(exc))
             return

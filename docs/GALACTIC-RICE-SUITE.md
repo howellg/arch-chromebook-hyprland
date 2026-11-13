@@ -151,3 +151,7 @@ API on loopback and leave the vaults and Syncthing settings untouched.
 
 Use **Open in Obsidian** beside either vault to open its registered Syncthing
 folder. Obsidian opens on Workspace 5, Imperial Databank, by default.
+
+Press **Super+Space** and search for **Arulia**, **DM vault**, or **Player vault**
+to open a registered Arulia vault in Obsidian. The launcher shows its
+Workspace 5 destination in the preview.
