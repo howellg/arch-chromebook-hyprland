@@ -60,6 +60,9 @@ def waybar_config(original, home):
     workspaces["format-icons"].update({
         str(id): chr(0xE901 + index) for index, id in enumerate(SECTORS)
     })
+    monitor = shlex.quote(str(home / ".local/bin/hypr-command-monitor"))
+    for module in ("cpu", "memory"):
+        config.setdefault(module, {}).setdefault("on-click", monitor)
     # Keep all buttons where they already were: avoid hiding Wi-Fi, battery, etc.
     return json.dumps(config,ensure_ascii=False,indent=4)+"\n"
 
@@ -194,6 +197,10 @@ window.holonet-search .sector-icon {{
     font-family:"Galactic Sector";font-size:16px;color:{a};
 }}
 window.holonet-search .app-name {{font-weight:800;}}
+window.holonet-search .monitor-value {{color:{a};font-size:20px;font-weight:800;}}
+window.holonet-search levelbar block {{min-height:5px;border-radius:0;background-image:none;}}
+window.holonet-search levelbar block.filled {{background-color:{a};}}
+window.holonet-search levelbar block.empty {{background-color:{edge};}}
 window.holonet-search button {{
     background-image:none; background-color:{card}; color:{txt};
     border:1px solid {edge}; border-radius:0 7px 0 7px; padding:7px 10px;

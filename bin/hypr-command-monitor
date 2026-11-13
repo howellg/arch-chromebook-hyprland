@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Live CPU, memory, temperature, and battery readings for Command Bridge."""
+from dataclasses import dataclass
+import json
+from pathlib import Path
+import sys
+
+
+@dataclass(frozen=True)
+class Reading:
+    label: str
+    value: str
+    detail: str
+    fraction: float | None = None
+
+
+def read(path):
+    try:
+        return Path(path).read_text().strip()
+    except OSError:
+        return ""
+
+
+def cpu_counters():
+    fields = read("/proc/stat").splitlines()
+    if fields:
+        try:
+            values = list(map(int, fields[0].split()[1:9]))
+            return sum(values), values[3] + values[4]
+        except (IndexError, ValueError):
+            pass
+    return None
+
+
+def cpu_reading(before, after):
+    if before and after:
+        total = after[0] - before[0]
+        idle = after[1] - before[1]
+        if total > 0 and 0 <= idle <= total:
+            fraction = (total - idle) / total
+            return Reading("CPU", f"{fraction:.0%}", "Overall processor usage", fraction)
+    return Reading("CPU", "—", "Waiting for a sample" if after else "Usage unavailable")
+
+
+def memory_reading():
+    memory = {}
+    for line in read("/proc/meminfo").splitlines():
+        key, _, value = line.partition(":")
+        if key in {"MemTotal", "MemAvailable"}:
+            try:
+                memory[key] = int(value.split()[0])
+            except (IndexError, ValueError):
+                continue
+    total = memory.get("MemTotal", 0)
+    available = memory.get("MemAvailable")
+    if total > 0 and available is not None and 0 <= available <= total:
+        used = total - available
+        gib = 1024 ** 2
+        return Reading("RAM", f"{used / gib:.1f} / {total / gib:.1f} GiB",
+                       f"{available / gib:.1f} GiB available", used / total)
+    return Reading("RAM", "—", "Memory readings unavailable")
+
+
+def temperature_reading():
+    for device in sorted(Path("/sys/class/hwmon").glob("hwmon*")):
+        driver = read(device / "name")
+        if driver not in {"coretemp", "k10temp"}:
+            continue
+        for sensor in sorted(device.glob("temp*_label")):
+            label = read(sensor)
+            if not label.startswith("Package id ") and label not in {"Tdie", "Tctl"}:
+                continue
+            try:
+                degrees = int(read(sensor.with_name(sensor.name.replace("_label", "_input")))) / 1000
+            except ValueError:
+                continue
+            return Reading("CPU TEMPERATURE", f"{degrees:.0f} °C", label)
+    return Reading("CPU TEMPERATURE", "—", "CPU sensor unavailable")
+
+
+def battery_reading():
+    for device in sorted(Path("/sys/class/power_supply").glob("BAT*")):
+        try:
+            capacity = int(read(device / "capacity"))
+        except ValueError:
+            continue
+        if 0 <= capacity <= 100:
+            state = read(device / "status") or "Charge state unavailable"
+            return Reading("BATTERY", f"{capacity}%", state, capacity / 100)
+    return Reading("BATTERY", "—", "Battery readings unavailable")
+
+
+def readings(before, after):
+    return (cpu_reading(before, after), memory_reading(), temperature_reading(), battery_reading())
+
+
+def launch():
+    from galactic_panel import GLib, Gtk, heading, panel
+
+    window = panel("Command Bridge System Monitor", 540, 340)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    window.add(root)
+    root.pack_start(heading("\ue906   COMMAND BRIDGE / SYSTEM MONITOR"), False, False, 0)
+    grid = Gtk.Grid(column_spacing=10, row_spacing=10, column_homogeneous=True)
+    root.pack_start(grid, True, True, 0)
+    widgets = []
+
+    for index, label in enumerate(("CPU", "RAM", "CPU TEMPERATURE", "BATTERY")):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
+        card.get_style_context().add_class("destination")
+        grid.attach(card, index % 2, index // 2, 1, 1)
+        card.pack_start(Gtk.Label(label=label, xalign=0), False, False, 0)
+        value = Gtk.Label(xalign=0)
+        value.get_style_context().add_class("monitor-value")
+        card.pack_start(value, False, False, 0)
+        detail = Gtk.Label(xalign=0, wrap=True)
+        card.pack_start(detail, False, False, 0)
+        meter = Gtk.LevelBar.new_for_interval(0, 10)
+        meter.set_mode(Gtk.LevelBarMode.DISCRETE)
+        meter.set_no_show_all(True)
+        card.pack_end(meter, False, False, 0)
+        widgets.append((value, detail, meter))
+
+    before = None
+
+    def refresh():
+        nonlocal before
+        after = cpu_counters()
+        for (value, detail, meter), reading in zip(widgets, readings(before, after)):
+            value.set_text(reading.value)
+            detail.set_text(reading.detail)
+            meter.set_visible(reading.fraction is not None)
+            if reading.fraction is not None:
+                meter.set_value(round(reading.fraction * 10))
+        before = after
+        return GLib.SOURCE_CONTINUE
+
+    window.show_all()
+    refresh()
+    GLib.timeout_add_seconds(1, refresh)
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--status"]:
+        from dataclasses import asdict
+        from time import sleep
+        before = cpu_counters()
+        sleep(0.25)
+        print(json.dumps([asdict(item) for item in readings(before, cpu_counters())]))
+    else:
+        launch()

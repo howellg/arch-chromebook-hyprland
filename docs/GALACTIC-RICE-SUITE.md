@@ -169,3 +169,9 @@ direct-copy and direct-save shortcuts remain available.
 Priority alerts and workspace jumps through the Vault play short cues.
 Do Not Disturb silences the priority chirp. The Galactic sound cues switch
 in Tactical Quick Settings mutes both sounds.
+
+## Command Bridge system monitor
+
+Click Waybar's CPU or RAM reading in a Galactic theme to open Command Bridge.
+The panel updates CPU use, memory, CPU temperature, and battery charge and
+state once a second while open. Press Esc to dismiss it.
