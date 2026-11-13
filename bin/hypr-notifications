@@ -1,91 +1,288 @@
 #!/usr/bin/env python3
-"""Mako notifications center and optional scheduled quiet hours."""
+"""Fleet Communications, backed by Mako's active notifications and history."""
+from datetime import datetime
+from html import unescape
+import json
+import os
 from pathlib import Path
-import subprocess, json, re
-import gi
-gi.require_version("Gtk","3.0")
-from gi.repository import Gtk
-HOME=Path.home()
-SCHEDULE=HOME/".config/chromebook/dnd-schedule"
+import re
+import sqlite3
+import subprocess
+import sys
+import time
+
+HOME = Path.home()
+SCHEDULE = HOME / ".config/chromebook/dnd-schedule"
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+TIMES = RUNTIME / "fleet-communications.sqlite"
+DND = "do-not-disturb"
+
+
 def call(*args):
     try:
-        r=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=4)
-        return r.stdout.strip() if r.returncode==0 else ""
-    except (OSError,subprocess.TimeoutExpired):return ""
-class Center(Gtk.Window):
-    def __init__(self):
-        super().__init__(title="Chromebook · Notifications")
-        self.set_default_size(660,620)
-        self.set_border_width(14)
-        self.connect("destroy",Gtk.main_quit)
-        root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8);self.add(root)
-        title=Gtk.Label(label="Notifications & Quiet Hours")
-        title.set_xalign(0);root.pack_start(title,False,False,0)
-        self.search=Gtk.SearchEntry()
-        self.search.set_placeholder_text("Search notification history")
-        self.search.connect("search-changed",lambda *_:self.render())
-        root.pack_start(self.search,False,False,0)
-        bar=Gtk.Box(spacing=8);root.pack_start(bar,False,False,0)
-        for name,fn in (("Refresh",self.refresh),("Restore latest",self.restore),
-                        ("Dismiss visible",self.dismiss),("Toggle Do Not Disturb",self.toggle)):
-            b=Gtk.Button(label=name);b.connect("clicked",fn);bar.pack_start(b,False,False,0)
-        scroll=Gtk.ScrolledWindow();root.pack_start(scroll,True,True,0)
-        self.listbox=Gtk.ListBox();scroll.add(self.listbox)
-        footer=Gtk.Box(spacing=7);root.pack_start(footer,False,False,0)
-        footer.pack_start(Gtk.Label(label="Quiet hours:"),False,False,0)
-        self.begin=Gtk.Entry();self.begin.set_width_chars(6);self.begin.set_text("22:00")
-        self.end=Gtk.Entry();self.end.set_width_chars(6);self.end.set_text("07:00")
-        if SCHEDULE.is_file():
-            parts=SCHEDULE.read_text().strip().split()
-            if len(parts)==2:self.begin.set_text(parts[0]);self.end.set_text(parts[1])
-        footer.pack_start(self.begin,False,False,0);footer.pack_start(Gtk.Label(label="to"),False,False,0)
-        footer.pack_start(self.end,False,False,0)
-        for name,fn in (("Enable",self.enable),("Disable",self.disable)):
-            b=Gtk.Button(label=name);b.connect("clicked",fn);footer.pack_start(b,False,False,0)
-        self.status=Gtk.Label(label="Quiet hours are off until enabled.")
-        self.status.set_xalign(0);root.pack_start(self.status,False,False,0)
-        self.load();self.show_all()
-    def load(self):
-        items=[]
-        for arg in ("history","list"):
+        return subprocess.check_output(args, stderr=subprocess.DEVNULL, text=True, timeout=2).strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def owner():
+    return call("busctl", "--user", "call", "org.freedesktop.DBus",
+                "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetNameOwner",
+                "s", "org.freedesktop.Notifications")
+
+
+def record(id_):
+    daemon = owner()
+    if not daemon or not id_.isdecimal():
+        return
+    try:
+        with sqlite3.connect(TIMES) as db:
+            db.execute("CREATE TABLE IF NOT EXISTS arrivals (daemon TEXT, id INTEGER, "
+                       "received REAL, PRIMARY KEY (daemon, id))")
+            db.execute("INSERT OR IGNORE INTO arrivals VALUES (?, ?, ?)",
+                       (daemon, int(id_), time.time()))
+            db.execute("DELETE FROM arrivals WHERE daemon != ? OR id < "
+                       "(SELECT max(id) - 1024 FROM arrivals WHERE daemon = ?)",
+                       (daemon, daemon))
+    except sqlite3.Error:
+        pass
+
+
+def snapshot():
+    items = {}
+    daemon = owner()
+    if not daemon:
+        return None
+    for command in ("list", "history"):
+        raw = call("makoctl", command, "-j")
+        try:
+            rows = json.loads(raw or "")
+        except ValueError:
+            return None
+        for item in rows:
+            if item.get("app_name") != "Chromebook controls":
+                items.setdefault(item["id"], (item, command == "list"))
+    timestamps = {}
+    if TIMES.is_file():
+        try:
+            with sqlite3.connect(TIMES, timeout=0.2) as db:
+                timestamps = dict(db.execute("SELECT id, received FROM arrivals WHERE daemon = ?",
+                                             (daemon,)))
+        except sqlite3.Error:
+            pass
+    return [(item, active, timestamps.get(id_))
+            for id_, (item, active) in sorted(items.items(), reverse=True)]
+
+
+def launch():
+    import gi
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk, GLib, Gtk, Pango
+
+    css = b"""
+    window.fleet { background: #111620; color: #e7eaf0; font-family: 'JetBrainsMono Nerd Font'; }
+    .fleet .heading { color: #ed7775; font-size: 20px; font-weight: bold; }
+    .fleet .dish { font-family: 'Galactic Sector'; color: #ed7775; font-size: 26px; }
+    .fleet .muted { color: #acb6c8; }
+    .fleet .subject { color: #f1e9ed; font-weight: bold; }
+    .fleet .priority { color: #ff898d; font-weight: bold; }
+    .fleet entry, .fleet button { background-image: none; background-color: #1c2330;
+        color: #e7eaf0; border: 1px solid #3e4657; border-radius: 4px; box-shadow: none; }
+    .fleet button:hover, .fleet button:focus, .fleet entry:focus { border-color: #ed7775; }
+    .fleet button:checked { background-color: #582631; border-color: #ed7775; }
+    .fleet button:disabled { color: #8994a9; }
+    .fleet list { background: #111620; }
+    .fleet row { background: #1a202b; margin-bottom: 5px; border-left: 2px solid #62434e; }
+    .fleet row.critical { border-left-color: #ff626a; background: #261a24; }
+    """
+
+    def label(text="", style=None, wrap=False):
+        widget = Gtk.Label(label=text, xalign=0)
+        if wrap:
+            widget.set_line_wrap(True)
+            widget.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            widget.set_max_width_chars(62)
+            widget.set_selectable(True)
+        if style:
+            widget.get_style_context().add_class(style)
+        return widget
+
+    def button(text, callback):
+        widget = Gtk.Button(label=text)
+        widget.connect("clicked", callback)
+        return widget
+
+    class Center(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Fleet Communications")
+            self.set_default_size(700, 570)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.set_border_width(18)
+            self.get_style_context().add_class("fleet")
+            self.connect("destroy", Gtk.main_quit)
+            self.connect("key-press-event", self.on_key)
+            self.items = None
+            self.syncing = False
+
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            self.add(root)
+            header = Gtk.Box(spacing=10)
+            root.pack_start(header, False, False, 0)
+            header.pack_start(label("\ue904", "dish"), False, False, 0)
+            header.pack_start(label("FLEET COMMUNICATIONS", "heading"), True, True, 0)
+            self.dnd = Gtk.ToggleButton(label="Do Not Disturb · Off")
+            self.dnd.connect("toggled", self.toggle)
+            header.pack_end(self.dnd, False, False, 0)
+
+            self.search = Gtk.SearchEntry()
+            self.search.set_placeholder_text("Search transmissions")
+            self.search.connect("search-changed", self.render)
+            root.pack_start(self.search, False, False, 0)
+            scroll = Gtk.ScrolledWindow()
+            scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            root.pack_start(scroll, True, True, 0)
+            self.listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+            scroll.add(self.listbox)
+            self.empty = label("No transmissions yet", "muted")
+            self.empty.set_margin_top(14)
+            self.listbox.set_placeholder(self.empty)
+
+            actions = Gtk.Box(spacing=8)
+            root.pack_start(actions, False, False, 0)
+            for text, command in (("Restore latest", ("restore",)),
+                                  ("Dismiss visible", ("dismiss", "-a"))):
+                actions.pack_start(button(text, lambda _, cmd=command: self.action(*cmd)),
+                                   False, False, 0)
+
+            footer = Gtk.Box(spacing=7)
+            root.pack_start(footer, False, False, 0)
+            footer.pack_start(label("Quiet hours", "muted"), False, False, 0)
+            self.begin = Gtk.Entry(width_chars=5, max_length=5)
+            self.end = Gtk.Entry(width_chars=5, max_length=5)
+            self.begin.set_text("22:00")
+            self.end.set_text("07:00")
             try:
-                data=json.loads(call("makoctl",arg,"-j") or "[]")
-                if isinstance(data,list):items.extend(data)
-            except ValueError:pass
-        self.items=list({(x.get("id"),x.get("summary"),x.get("body")):x for x in items}.values())
-        self.render()
-    def render(self):
-        for widget in list(self.listbox.get_children()):self.listbox.remove(widget)
-        needle=self.search.get_text().lower()
-        for item in self.items:
-            app=str(item.get("app_name") or "App")
-            summary=str(item.get("summary") or "")
-            body=str(item.get("body") or "")
-            if needle and needle not in (app+" "+summary+" "+body).lower():continue
-            label=Gtk.Label(label=(app+" — "+summary+"\n"+body)[:400])
-            label.set_xalign(0);label.set_line_wrap(True);label.set_selectable(True)
-            label.set_margin_top(7);label.set_margin_bottom(7)
-            self.listbox.add(label)
-        self.listbox.show_all()
-    def refresh(self,*_):self.load()
-    def restore(self,*_):call("makoctl","restore");self.load()
-    def dismiss(self,*_):call("makoctl","dismiss","-a");self.load()
-    def toggle(self,*_):
-        call("makoctl","mode","-t","do-not-disturb")
-        self.status.set_text("Do Not Disturb toggled.")
-    def enable(self,*_):
-        start,end=self.begin.get_text().strip(),self.end.get_text().strip()
-        def valid(s):
-            if not re.fullmatch(r"\d\d:\d\d",s):return False
-            h,m=map(int,s.split(":"));return h<24 and m<60
-        if not valid(start) or not valid(end):
-            self.status.set_text("Use HH:MM times (24-hour clock).");return
-        SCHEDULE.parent.mkdir(parents=True,exist_ok=True)
-        SCHEDULE.write_text(f"{start} {end}\n")
-        call(str(HOME/".local/bin/chromebook-dnd-schedule"))
-        self.status.set_text(f"Quiet hours enabled: {start}–{end}")
-    def disable(self,*_):
-        SCHEDULE.parent.mkdir(parents=True,exist_ok=True);SCHEDULE.write_text("off\n")
-        call(str(HOME/".local/bin/chromebook-dnd-schedule"))
-        self.status.set_text("Scheduled quiet hours disabled.")
-Center();Gtk.main()
+                start, end = SCHEDULE.read_text().split()
+                self.begin.set_text(start)
+                self.end.set_text(end)
+                initial_status = f"Quiet hours enabled · {start}–{end}"
+            except (OSError, ValueError):
+                initial_status = "Scheduled quiet hours off"
+            for widget in (self.begin, label("to", "muted"), self.end,
+                           button("Enable", self.enable), button("Disable", self.disable)):
+                footer.pack_start(widget, False, False, 0)
+            self.status = label(initial_status, "muted")
+            root.pack_start(self.status, False, False, 0)
+            self.show_all()
+            self.empty.show()
+            self.refresh()
+            GLib.timeout_add(1500, self.refresh)
+            self.search.grab_focus()
+
+        def on_key(self, _, event):
+            if event.keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            return False
+
+        def refresh(self):
+            current = snapshot()
+            if current != self.items:
+                self.items = current
+                self.render()
+            modes = call("makoctl", "mode")
+            self.syncing = True
+            enabled = modes is not None and DND in modes.splitlines()
+            self.dnd.set_sensitive(modes is not None)
+            self.dnd.set_active(enabled)
+            self.dnd.set_label(f"Do Not Disturb · {'On' if enabled else 'Off'}"
+                               if modes is not None else "Do Not Disturb · Unavailable")
+            self.syncing = False
+            return GLib.SOURCE_CONTINUE
+
+        def render(self, *_):
+            for widget in self.listbox.get_children():
+                self.listbox.remove(widget)
+            query = self.search.get_text().casefold().split()
+            if self.items is None:
+                self.empty.set_text("Notification service unavailable")
+                return
+            self.empty.set_text("No matching transmissions" if query else "No transmissions yet")
+            for item, active, received in self.items:
+                app = item.get("app_name") or "Unknown app"
+                summary = item.get("summary") or "(No subject)"
+                body = unescape(re.sub(r"</?(?:b|i|u|a|img)\b[^>]*>", "", item.get("body") or ""))
+                critical = item.get("urgency") == "critical"
+                terms = f"{app} {summary} {body} {'priority critical' if critical else ''}".casefold()
+                if not all(word in terms for word in query):
+                    continue
+                row = Gtk.ListBoxRow()
+                if critical:
+                    row.get_style_context().add_class("critical")
+                content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                for edge in ("top", "bottom", "start", "end"):
+                    getattr(content, f"set_margin_{edge}")(9)
+                meta = Gtk.Box(spacing=10)
+                app_label = label(app, "muted")
+                app_label.set_ellipsize(Pango.EllipsizeMode.END)
+                meta.pack_start(app_label, True, True, 0)
+                if active:
+                    meta.pack_start(label("ACTIVE", "muted"), False, False, 0)
+                if critical:
+                    meta.pack_start(label("PRIORITY", "priority"), False, False, 0)
+                stamp = datetime.fromtimestamp(received).strftime("%b %d · %H:%M") if received else ""
+                if stamp:
+                    meta.pack_end(label(stamp, "muted"), False, False, 0)
+                content.pack_start(meta, False, False, 0)
+                content.pack_start(label(summary, "subject", wrap=True), False, False, 0)
+                if body:
+                    content.pack_start(label(body, wrap=True), False, False, 0)
+                row.add(content)
+                self.listbox.add(row)
+            self.listbox.show_all()
+
+        def action(self, *command):
+            if call("makoctl", *command) is None:
+                self.status.set_text("Notification command failed.")
+            self.refresh()
+
+        def toggle(self, widget):
+            if not self.syncing:
+                self.action("mode", "-a" if widget.get_active() else "-r", DND)
+
+        def enable(self, *_):
+            start, end = self.begin.get_text().strip(), self.end.get_text().strip()
+            if not all(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value) for value in (start, end)):
+                self.status.set_text("Use HH:MM times (24-hour clock).")
+                return
+            self.save_schedule(f"{start} {end}", f"Quiet hours enabled · {start}–{end}")
+
+        def disable(self, *_):
+            self.save_schedule("off", "Scheduled quiet hours off")
+
+        def save_schedule(self, value, status):
+            try:
+                SCHEDULE.parent.mkdir(parents=True, exist_ok=True)
+                SCHEDULE.write_text(value + "\n")
+            except OSError:
+                self.status.set_text("Could not save quiet hours.")
+                return
+            if call(str(HOME / ".local/bin/chromebook-dnd-schedule")) is None:
+                status += " · Could not apply now"
+            self.status.set_text(status)
+            self.refresh()
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(css)
+    Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    Center()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--record":
+        record(sys.argv[2])
+    else:
+        launch()

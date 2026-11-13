@@ -469,6 +469,11 @@ hl.window_rule({
     float = true, center = true, size = "540 660",
 })
 hl.window_rule({
+    name = "fleet-communications-log",
+    match = { class = "^hypr-notifications$" },
+    float = true, center = true,
+})
+hl.window_rule({
     name = "sith-holocron-vault-picker",
     match = { class = "^Sith Holocron Vault$" },
     float = true, center = true,
