@@ -17,3 +17,9 @@ For Imperial HoloNet on Firefox Home and New Tab, also copy `holonet.css`,
 `holonet-wordmark.svg`, and `holonet-viewport.svg` into the same directory.
 Add `@import url("holonet.css");` at the top of `chrome/userContent.css`.
 Restart Firefox. Remove that import and restart to restore the stock pages.
+
+For the minimal console layout, turn off Recent Activity and Weather in
+Firefox Home settings. In Firefox 160 the corresponding
+`browser.newtabpage.activity-stream.` preferences are
+`feeds.section.highlights`, `showWeather`, and `widgets.weather.enabled`.
+Set these to false in `about:config` to cover both weather layouts.
