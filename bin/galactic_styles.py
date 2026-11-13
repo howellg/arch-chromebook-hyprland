@@ -62,7 +62,17 @@ def waybar_config(original, home):
     })
     monitor = shlex.quote(str(home / ".local/bin/hypr-command-monitor"))
     for module in ("cpu", "memory"):
-        config.setdefault(module, {}).setdefault("on-click", monitor)
+        if module in right:
+            index = right.index(module)
+            if "custom/command-bridge" not in right:
+                right.insert(index, "custom/command-bridge")
+            right.remove(module)
+    config["custom/command-bridge"] = {
+        "format": "\ue906",
+        "tooltip": True,
+        "tooltip-format": "Command Bridge · System Monitor",
+        "on-click": monitor,
+    }
     # Keep all buttons where they already were: avoid hiding Wi-Fi, battery, etc.
     return json.dumps(config,ensure_ascii=False,indent=4)+"\n"
 
@@ -85,7 +95,7 @@ tooltip {{
     padding:5px;
 }}
 tooltip label {{color:{txt};}}
-#custom-arch,#workspaces,#custom-sector,#clock,#cpu,#memory,#custom-holonet-link,
+#custom-arch,#workspaces,#custom-sector,#clock,#custom-command-bridge,#custom-holonet-link,
 #pulseaudio,#backlight,#battery,#tray,#custom-power,#custom-settings,
 #custom-power-profile,#custom-comms {{
     background:linear-gradient(to bottom, #242630, #11131b);
@@ -137,8 +147,8 @@ tooltip label {{color:{txt};}}
     color:#f08883; border-bottom-color:#ed6664;
 }}
 #clock {{ color:{txt}; font-size:11px; font-weight:800; padding:4px 11px; }}
-#cpu {{color:{txt};}}
-#memory {{color:{txt};}}
+#custom-command-bridge {{color:{a}; font-size:15px; padding:3px 9px;}}
+#custom-command-bridge:hover {{background:alpha({a},.22);}}
 #custom-holonet-link {{color:{txt};}}
 #custom-holonet-link.linked {{color:{a};}}
 #custom-holonet-link.degraded {{color:#e9bf84;}}

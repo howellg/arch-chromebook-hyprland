@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Live CPU, memory, temperature, and battery readings for Command Bridge."""
+from collections import deque
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
+from time import monotonic
+
+HISTORY_SECONDS = 60
 
 
 @dataclass(frozen=True)
@@ -12,6 +16,7 @@ class Reading:
     value: str
     detail: str
     fraction: float | None = None
+    degrees: float | None = None
 
 
 def read(path):
@@ -74,7 +79,7 @@ def temperature_reading():
                 degrees = int(read(sensor.with_name(sensor.name.replace("_label", "_input")))) / 1000
             except ValueError:
                 continue
-            return Reading("CPU TEMPERATURE", f"{degrees:.0f} °C", label)
+            return Reading("CPU TEMPERATURE", f"{degrees:.0f} °C", label, degrees=degrees)
     return Reading("CPU TEMPERATURE", "—", "CPU sensor unavailable")
 
 
@@ -94,10 +99,44 @@ def readings(before, after):
     return (cpu_reading(before, after), memory_reading(), temperature_reading(), battery_reading())
 
 
+def draw_trend(area, cr, history, ceiling):
+    width = area.get_allocated_width() - 2
+    height = area.get_allocated_height() - 2
+    cr.set_source_rgb(.20, .23, .30)
+    cr.set_line_width(1)
+    for y in (1, 1 + height / 2, 1 + height):
+        cr.move_to(1, y)
+        cr.line_to(1 + width, y)
+    cr.stroke()
+    if not history:
+        return False
+
+    right = history[-1][0]
+    cr.set_source_rgb(.93, .47, .46)
+    cr.set_line_width(1.8)
+    previous = None
+    for timestamp, value in history:
+        if value is None:
+            previous = None
+            continue
+        x = 1 + width * (1 - (right - timestamp) / HISTORY_SECONDS)
+        y = 1 + height * (1 - min(1, max(0, value / ceiling)))
+        if previous is not None and timestamp - previous[0] <= 2.5:
+            cr.move_to(*previous[1:])
+            cr.line_to(x, y)
+            cr.stroke()
+        cr.arc(x, y, 1.25, 0, 6.283185)
+        cr.fill()
+        previous = timestamp, x, y
+    return False
+
+
 def launch():
+    import gi
+    gi.require_foreign("cairo")
     from galactic_panel import GLib, Gtk, heading, panel
 
-    window = panel("Command Bridge System Monitor", 540, 340)
+    window = panel("Command Bridge System Monitor", 620, 390)
     root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
     window.add(root)
     root.pack_start(heading("\ue906   COMMAND BRIDGE / SYSTEM MONITOR"), False, False, 0)
@@ -105,7 +144,9 @@ def launch():
     root.pack_start(grid, True, True, 0)
     widgets = []
 
-    for index, label in enumerate(("CPU", "RAM", "CPU TEMPERATURE", "BATTERY")):
+    cards = (("CPU", 1, "0–100%"), ("RAM", 1, "0–100%"),
+             ("CPU TEMPERATURE", 110, "0–110 °C"), ("BATTERY", None, ""))
+    for index, (label, ceiling, units) in enumerate(cards):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
         card.get_style_context().add_class("destination")
         grid.attach(card, index % 2, index // 2, 1, 1)
@@ -119,19 +160,35 @@ def launch():
         meter.set_mode(Gtk.LevelBarMode.DISCRETE)
         meter.set_no_show_all(True)
         card.pack_end(meter, False, False, 0)
-        widgets.append((value, detail, meter))
+        history = deque()
+        trend = None
+        if ceiling is not None:
+            trend = Gtk.DrawingArea()
+            trend.set_size_request(-1, 58)
+            trend.connect("draw", draw_trend, history, ceiling)
+            card.pack_start(trend, True, True, 0)
+            legend = Gtk.Label(label=f"Last 60 s  ·  {units}", xalign=0)
+            card.pack_start(legend, False, False, 0)
+        widgets.append((value, detail, meter, trend, history))
 
     before = None
 
     def refresh():
         nonlocal before
         after = cpu_counters()
-        for (value, detail, meter), reading in zip(widgets, readings(before, after)):
+        now = monotonic()
+        for (value, detail, meter, trend, history), reading in zip(widgets, readings(before, after)):
             value.set_text(reading.value)
             detail.set_text(reading.detail)
             meter.set_visible(reading.fraction is not None)
             if reading.fraction is not None:
                 meter.set_value(round(reading.fraction * 10))
+            if trend is not None:
+                sample = reading.degrees if reading.label == "CPU TEMPERATURE" else reading.fraction
+                history.append((now, sample))
+                while history[0][0] < now - HISTORY_SECONDS:
+                    history.popleft()
+                trend.queue_draw()
         before = after
         return GLib.SOURCE_CONTINUE
 
