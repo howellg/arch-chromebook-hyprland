@@ -21,3 +21,7 @@ id_*
 *.db
 *.cache
 fish_variables
+
+# Godot editor cache and transient scene data
+apps/sith-holocron-vault/.godot/
+apps/sith-holocron-vault/.import/

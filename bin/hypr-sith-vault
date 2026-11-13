@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Launch original 3D Sith Vault without replacing Super+Tab's window overview.
+set -euo pipefail
+repo="$HOME/Projects/arch-chromebook-hyprland"
+if [[ -f "$HOME/.config/chromebook/repository-path" ]]; then
+  read -r repo < "$HOME/.config/chromebook/repository-path"
+fi
+project="$repo/apps/sith-holocron-vault"
+if [[ ! -f "$project/project.godot" ]]; then
+  project="$HOME/.local/share/sith-holocron-vault"
+fi
+if [[ ! -f "$project/project.godot" ]]; then
+  notify-send "Sith Vault" "Godot project not found; clone arch-chromebook-hyprland first." 2>/dev/null || :
+  exit 2
+fi
+if command -v godot >/dev/null 2>&1; then
+  engine="$(command -v godot)"
+elif [[ -x "$HOME/.local/opt/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64" ]]; then
+  engine="$HOME/.local/opt/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64"
+else
+  notify-send "Sith Vault" "Godot 4.7 not installed. Install with: sudo pacman -S godot" 2>/dev/null || :
+  exit 3
+fi
+mkdir -p "$HOME/.local/state/sith-vault"
+exec 9>"$HOME/.local/state/sith-vault/instance.lock"
+if ! flock -n 9; then
+  exit 0
+fi
+exec "$engine" --path "$project" --rendering-method gl_compatibility "$@"

@@ -325,6 +325,8 @@ hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-quick-setti
 hl.bind("SUPER + SHIFT + Y", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-starwars menu"))
 -- HoloNet Command Console; retains Super+Space as direct application search.
 hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-holonet-launcher"))
+-- Opt-in Godot 3D Sith holocron picker; existing Super+Tab overview is untouched.
+hl.bind("SUPER + SHIFT + J", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-sith-vault"))
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-wallpaper-picker"))
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-screenshot-edit region"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("@HOME@/.local/bin/hypr-record start region"))
@@ -460,6 +462,11 @@ hl.window_rule({
     name = "galactic-tactical-quick-settings",
     match = { class = "^hypr-quick-settings$" },
     float = true, center = true, size = "540 660",
+})
+hl.window_rule({
+    name = "sith-holocron-vault-picker",
+    match = { class = "^Sith Holocron Vault$" },
+    float = true, center = true, size = "1160 700",
 })
 hl.window_rule({
     name = "vscode-workspace-3",

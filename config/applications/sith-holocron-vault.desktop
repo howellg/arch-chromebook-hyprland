@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sith Holocron Vault
+GenericName=3D Workspace Navigator
+Comment=Godot 3D Sith / Rakatan / Imperial workspace selector
+Exec=@HOME@/.local/bin/hypr-sith-vault
+Icon=applications-graphics
+Terminal=false
+Categories=Utility;
+Keywords=StarWars;Sith;Holocron;Godot;Hyprland;Workspace;KOTOR;
+StartupNotify=true
