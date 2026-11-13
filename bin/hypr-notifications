@@ -123,6 +123,7 @@ def waybar():
 
 
 def launch():
+    from galactic_panel import reveal
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("Gdk", "3.0")
@@ -234,6 +235,7 @@ def launch():
                 footer.pack_start(widget, False, False, 0)
             self.status = label(initial_status, "muted")
             root.pack_start(self.status, False, False, 0)
+            reveal(self)
             self.show_all()
             self.empty.show()
             self.refresh()

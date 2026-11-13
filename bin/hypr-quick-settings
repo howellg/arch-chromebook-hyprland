@@ -3,6 +3,8 @@
 import subprocess
 import sys
 from pathlib import Path
+from galactic_panel import reveal
+
 import gi
 from galactic_audio import muted, set_muted
 gi.require_version("Gtk", "3.0")
@@ -140,6 +142,7 @@ class Settings(Gtk.Window):
             btn.connect("clicked", self.set_mode, name)
             modes.pack_start(btn, True, True, 0)
         self.refresh()
+        reveal(self)
         self.show_all()
         GLib.timeout_add_seconds(10, self.refresh)
 

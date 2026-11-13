@@ -208,3 +208,7 @@ Confirmed jumps to another workspace in the Holocron Vault show a short
 hyperspace effect in the destination's sector color. Esc closes the picker,
 including during the transition. The current workspace closes immediately.
 The effect follows Hyprland’s animation setting. To skip it for one launch, use `hypr-sith-vault -- --no-hyperspace`.
+
+The Galactic desktop panels share a short horizontal opening reveal. It
+follows the Hyprland and GTK animation settings and keeps keyboard and
+pointer input available as soon as a panel opens.

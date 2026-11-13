@@ -212,6 +212,7 @@ def waybar():
 
 
 def launch():
+    from galactic_panel import reveal
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("Gdk", "3.0")
@@ -324,6 +325,7 @@ def launch():
         return GLib.SOURCE_CONTINUE
 
     refresh.connect("clicked", poll)
+    reveal(window)
     window.show_all()
     poll()
     GLib.timeout_add_seconds(15, poll)

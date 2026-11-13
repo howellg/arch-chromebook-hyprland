@@ -485,6 +485,12 @@ hl.window_rule({
     match = { class = "^hypr-notifications$" },
     float = true, center = true,
 })
+-- GTK consoles draw their own opening reveal inside a stationary window.
+hl.window_rule({
+    name = "galactic-console-reveal",
+    match = { class = "^(holonet-search|hypr-(holonet-link|notifications|quick-settings|command-power|command-monitor|datacards|overview-grid|imperial-capture))$" },
+    no_anim = true,
+})
 hl.window_rule({
     name = "sith-holocron-vault-picker",
     match = { class = "^Sith Holocron Vault$" },
